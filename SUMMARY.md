@@ -14,7 +14,7 @@ A **complete, production-ready** Watch Party application with:
 ✅ **Production configs** included  
 
 ---
-
+ 
 ## 🚀 Quick Start (5 Minutes)
 
 ```bash
