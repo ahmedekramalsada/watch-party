@@ -12,6 +12,8 @@ if ! command -v ffmpeg &> /dev/null; then
     exit 1
 fi
 
+
+mkdir -p media
 OUTPUT="media/movie.mp4"
 
 echo "📹 Generating 60-second test video..."

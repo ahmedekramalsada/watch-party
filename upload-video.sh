@@ -17,6 +17,7 @@ if [ -z "$1" ]; then
 fi
 
 INPUT_FILE="$1"
+mkdir -p media
 OUTPUT_FILE="media/movie.mp4"
 
 if [ ! -f "$INPUT_FILE" ]; then
