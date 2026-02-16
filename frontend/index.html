@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Party 🎬</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <h1>🎬 Watch Party</h1>
+            <p>شوف أفلام مع صحابك في نفس الوقت</p>
+        </div>
+
+        <div class="card">
+            <h2>ابدأ Watch Party جديد</h2>
+            <div class="form-group">
+                <label>اسمك</label>
+                <input type="text" id="username" placeholder="أدخل اسمك">
+            </div>
+            <div class="form-group">
+                <label>اسم الغرفة</label>
+                <input type="text" id="roomId" placeholder="مثلاً: movie-night">
+            </div>
+            <button class="btn btn-primary" onclick="createRoom()">
+                إنشاء غرفة جديدة
+            </button>
+        </div>
+
+        <div class="card">
+            <h2>انضم لحفلة موجودة</h2>
+            <div class="form-group">
+                <label>اسمك</label>
+                <input type="text" id="username-join" placeholder="أدخل اسمك">
+            </div>
+            <div class="form-group">
+                <label>كود الغرفة</label>
+                <input type="text" id="roomId-join" placeholder="أدخل كود الغرفة">
+            </div>
+            <button class="btn btn-secondary" onclick="joinRoom()">
+                انضمام للغرفة
+            </button>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="icon">🎥</div>
+                <h3>تزامن كامل</h3>
+                <p>Play/Pause/Seek متزامن مع كل الأعضاء</p>
+            </div>
+            <div class="feature">
+                <div class="icon">💬</div>
+                <h3>شات مباشر</h3>
+                <p>اتكلموا مع بعض أثناء المشاهدة</p>
+            </div>
+            <div class="feature">
+                <div class="icon">📱</div>
+                <h3>سهل الاستخدام</h3>
+                <p>شغال على أي جهاز - موبايل أو كمبيوتر</p>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>⚙️ كيفية رفع الفيلم</h3>
+            <ol>
+                <li>حط الفيلم في مجلد <code>media/</code> باسم <code>movie.mp4</code></li>
+                <li>أو استخدم OBS/FFmpeg لعمل stream لـ <code>rtmp://localhost:1935/live/movie</code></li>
+                <li>الفيلم هيظهر تلقائياً في كل الغرف</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function createRoom() {
+            const username = document.getElementById('username').value.trim();
+            const roomId = document.getElementById('roomId').value.trim();
+            
+            if (!username || !roomId) {
+                alert('من فضلك أدخل الاسم وكود الغرفة');
+                return;
+            }
+            
+            window.location.href = `room.html?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}`;
+        }
+
+        function joinRoom() {
+            const username = document.getElementById('username-join').value.trim();
+            const roomId = document.getElementById('roomId-join').value.trim();
+            
+            if (!username || !roomId) {
+                alert('من فضلك أدخل الاسم وكود الغرفة');
+                return;
+            }
+            
+            window.location.href = `room.html?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}`;
+        }
+
+        // Quick room ID generator
+        document.getElementById('roomId').value = 'room-' + Math.random().toString(36).substr(2, 6);
+    </script>
+</body>
+</html>

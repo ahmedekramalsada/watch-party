@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Party Room 🎬</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body class="room-page">
+    <div class="room-container">
+        <!-- Video Section -->
+        <div class="video-section">
+            <div class="video-header">
+                <h2 id="roomTitle">غرفة: <span id="roomName"></span></h2>
+                <div class="users-count">
+                    <span id="userCount">0</span> 👥
+                </div>
+            </div>
+            <div class="video-wrapper">
+                <video id="video" controls autoplay></video>
+                <div class="sync-indicator" id="syncIndicator">
+                    🔄 جاري المزامنة...
+                </div>
+            </div>
+            <div class="video-controls">
+                <button class="btn btn-small" onclick="copyRoomLink()">📋 نسخ رابط الغرفة</button>
+                <button class="btn btn-small btn-danger" onclick="leaveRoom()">🚪 مغادرة</button>
+            </div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-section">
+            <div class="chat-header">
+                <h3>💬 الشات</h3>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="اكتب رسالة..." onkeypress="handleMessageKeypress(event)">
+                <button class="btn btn-primary" onclick="sendMessage()">إرسال</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room');
+        const username = urlParams.get('username');
+
+        if (!roomId || !username) {
+            alert('معلومات الغرفة غير صحيحة');
+            window.location.href = 'index.html';
+        }
+
+        document.getElementById('roomName').textContent = roomId;
+
+        const video = document.getElementById('video');
+        const chatMessages = document.getElementById('chatMessages');
+        const syncIndicator = document.getElementById('syncIndicator');
+
+        let ws;
+        let isConnected = false;
+        let isSyncing = false;
+
+        // Initialize HLS
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+            });
+            hls.loadSource('/live/movie.m3u8');
+            hls.attachMedia(video);
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                console.log('HLS manifest loaded');
+                addSystemMessage('الفيلم جاهز للتشغيل 🎬');
+            });
+
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    console.error('HLS error:', data);
+                    addSystemMessage('خطأ في تحميل الفيلم - تأكد من وجود الفيلم في مجلد media/');
+                }
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = '/live/movie.m3u8';
+        } else {
+            addSystemMessage('المتصفح لا يدعم HLS - جرب Chrome أو Safari');
+        }
+
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                isConnected = true;
+                ws.send(JSON.stringify({
+                    type: 'join',
+                    roomId: roomId,
+                    username: username
+                }));
+                addSystemMessage('انت دلوقتي متصل! 🎉');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                isConnected = false;
+                addSystemMessage('الاتصال انقطع - جاري إعادة المحاولة...');
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleWebSocketMessage(data) {
+            switch(data.type) {
+                case 'state':
+                    syncVideoState(data);
+                    break;
+                
+                case 'sync':
+                    if (data.username !== username) {
+                        showSyncIndicator(`${data.username} قام بـ ${data.action === 'play' ? 'تشغيل' : 'إيقاف'} الفيديو`);
+                        syncVideoState(data);
+                    }
+                    break;
+
+                case 'seek':
+                    if (data.username !== username) {
+                        showSyncIndicator(`${data.username} قفز للثانية ${Math.floor(data.time)}`);
+                        isSyncing = true;
+                        video.currentTime = data.time;
+                        setTimeout(() => isSyncing = false, 500);
+                    }
+                    break;
+
+                case 'chat':
+                    addChatMessage(data.username, data.message);
+                    break;
+
+                case 'user-joined':
+                    addSystemMessage(`${data.username} انضم للغرفة 👋`);
+                    updateUserCount(data.userCount);
+                    break;
+
+                case 'user-left':
+                    addSystemMessage(`${data.username} غادر الغرفة 👋`);
+                    updateUserCount(data.userCount);
+                    break;
+            }
+        }
+
+        function syncVideoState(data) {
+            isSyncing = true;
+            
+            const timeDiff = Math.abs(video.currentTime - data.time);
+            if (timeDiff > 2) {
+                video.currentTime = data.time;
+            }
+
+            if (data.action === 'play' && video.paused) {
+                video.play().catch(e => console.log('Autoplay prevented:', e));
+            } else if (data.action === 'pause' && !video.paused) {
+                video.pause();
+            }
+
+            setTimeout(() => isSyncing = false, 500);
+        }
+
+        function showSyncIndicator(message) {
+            syncIndicator.textContent = message;
+            syncIndicator.style.display = 'block';
+            setTimeout(() => {
+                syncIndicator.style.display = 'none';
+            }, 2000);
+        }
+
+        // Video event listeners
+        video.addEventListener('play', () => {
+            if (!isSyncing && isConnected) {
+                ws.send(JSON.stringify({
+                    type: 'sync',
+                    action: 'play',
+                    time: video.currentTime
+                }));
+            }
+        });
+
+        video.addEventListener('pause', () => {
+            if (!isSyncing && isConnected) {
+                ws.send(JSON.stringify({
+                    type: 'sync',
+                    action: 'pause',
+                    time: video.currentTime
+                }));
+            }
+        });
+
+        video.addEventListener('seeked', () => {
+            if (!isSyncing && isConnected) {
+                ws.send(JSON.stringify({
+                    type: 'seek',
+                    time: video.currentTime
+                }));
+            }
+        });
+
+        // Chat functions
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (message && isConnected) {
+                ws.send(JSON.stringify({
+                    type: 'chat',
+                    message: message
+                }));
+                addChatMessage(username + ' (أنت)', message, true);
+                input.value = '';
+            }
+        }
+
+        function handleMessageKeypress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function addChatMessage(user, message, isOwn = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isOwn ? 'own-message' : ''}`;
+            messageDiv.innerHTML = `
+                <span class="message-user">${user}:</span>
+                <span class="message-text">${escapeHtml(message)}</span>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addSystemMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'chat-message system-message';
+            messageDiv.innerHTML = `<span class="message-text">${message}</span>`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function updateUserCount(count) {
+            document.getElementById('userCount').textContent = count;
+        }
+
+        function copyRoomLink() {
+            const link = window.location.href;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('تم نسخ الرابط! شاركه مع أصدقائك 🎉');
+            });
+        }
+
+        function leaveRoom() {
+            if (confirm('متأكد إنك عايز تسيب الغرفة؟')) {
+                ws.close();
+                window.location.href = 'index.html';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        connectWebSocket();
+    </script>
+</body>
+</html>
