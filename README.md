@@ -38,7 +38,25 @@ cd watchparty
 cp /path/to/your/movie.mp4 media/movie.mp4
 ```
 
-**Option B: Using FFmpeg** (For other formats)
+**Option A: Using Azure DevOps (Fully Automated)**
+1. Create a new Pipeline in Azure DevOps using `azure-pipelines.yml`.
+2. Click "Run Pipeline".
+3. Enter the **Direct Link** to your `.mp4` file in the "videoUrl" field.
+4. The pipeline will:
+   - Download the video.
+   - Convert it to HLS.
+   - Push it to the repo.
+   - Trigger Zeabur to redeploy.
+
+**Option B: Using the Helper Script (Run Locally)**
+1. Put your file in `media/` (e.g., `media/movie.mp4`).
+2. Run the script:
+   ```bash
+   ./convert.sh
+   ```
+3. Commit and push the `media/` folder.
+
+**Option C: Using FFmpeg Manually**
 ```bash
 ffmpeg -i /path/to/video.mkv -c:v libx264 -c:a aac media/movie.mp4
 ```

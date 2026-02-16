@@ -1,0 +1,63 @@
+trigger: none
+
+parameters:
+  - name: videoUrl
+    displayName: "Direct Link to Video (MP4/MKV)"
+    type: string
+    default: ""
+
+pool:
+  vmImage: "ubuntu-latest"
+
+jobs:
+  - job: UpdateMovie
+    displayName: "Download and Convert Movie"
+    steps:
+      - checkout: self
+        persistCredentials: true
+        fetchDepth: 1
+
+      - task: Bash@3
+        displayName: "Install FFmpeg"
+        inputs:
+          targetType: "inline"
+          script: |
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+
+      - task: Bash@3
+        displayName: "Download and Convert"
+        inputs:
+          targetType: "inline"
+          script: |
+            # Download
+            echo "Downloading video from ${{ parameters.videoUrl }}..."
+            # Use curl with -L to follow redirects
+            curl -L -o media/movie.mp4 "${{ parameters.videoUrl }}"
+
+            # Check if file is valid
+            if [ ! -s media/movie.mp4 ]; then
+              echo "Error: Downloaded file is empty or failed."
+              exit 1
+            fi
+
+            # Convert
+            echo "Converting to HLS..."
+            cd media
+            ffmpeg -i movie.mp4 -c:v libx264 -c:a aac -f hls -hls_time 10 -hls_list_size 0 -hls_segment_filename "movie_%03d.ts" movie.m3u8
+
+            # Remove source to save space
+            rm movie.mp4
+
+      - task: Bash@3
+        displayName: "Commit and Push"
+        inputs:
+          targetType: "inline"
+          script: |
+            git config --global user.email "azure-pipeline@watchparty.local"
+            git config --global user.name "Watch Party Bot"
+
+            git add media/
+            git commit -m "Update movie via Azure Pipeline" || echo "No changes to commit"
+
+            git push origin HEAD:$(Build.SourceBranchName)
