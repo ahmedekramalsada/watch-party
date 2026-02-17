@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Watch Party 🎬</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <div class="hero">
@@ -62,11 +64,11 @@
         </div>
 
         <div class="instructions">
-            <h3>⚙️ كيفية رفع الفيلم</h3>
+            <h3>⚙️ كيفية إضافة أفلام للمكتبة</h3>
             <ol>
-                <li>حط الفيلم في مجلد <code>media/</code> باسم <code>movie.mp4</code></li>
-                <li>أو استخدم OBS/FFmpeg لعمل stream لـ <code>rtmp://localhost:1935/live/movie</code></li>
-                <li>الفيلم هيظهر تلقائياً في كل الغرف</li>
+                <li>افتح ملف <code>media/catalog.json</code></li>
+                <li>أضف رابط الفيلم المباشر (Direct Link / .m3u8)</li>
+                <li>أو الصق الرابط مباشرة داخل الغرفة</li>
             </ol>
         </div>
     </div>
@@ -75,24 +77,24 @@
         function createRoom() {
             const username = document.getElementById('username').value.trim();
             const roomId = document.getElementById('roomId').value.trim();
-            
+
             if (!username || !roomId) {
                 alert('من فضلك أدخل الاسم وكود الغرفة');
                 return;
             }
-            
+
             window.location.href = `room.html?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}`;
         }
 
         function joinRoom() {
             const username = document.getElementById('username-join').value.trim();
             const roomId = document.getElementById('roomId-join').value.trim();
-            
+
             if (!username || !roomId) {
                 alert('من فضلك أدخل الاسم وكود الغرفة');
                 return;
             }
-            
+
             window.location.href = `room.html?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}`;
         }
 
@@ -100,4 +102,5 @@
         document.getElementById('roomId').value = 'room-' + Math.random().toString(36).substr(2, 6);
     </script>
 </body>
+
 </html>
