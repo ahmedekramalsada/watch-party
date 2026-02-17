@@ -30,8 +30,20 @@
             margin-bottom: 20px;
         }
 
+        .lobby-input {
+            padding: 15px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            margin-bottom: 20px;
+            width: 250px;
+            text-align: center;
+        }
+
         .btn-join {
-            padding: 20px 40px;
+            padding: 15px 40px;
             font-size: 1.5em;
             background: #27ae60;
             color: white;
@@ -47,7 +59,7 @@
             background: #2ecc71;
         }
 
-        /* Movie Selector */
+        /* Movie Selector & Custom Link */
         .movie-selector {
             margin: 15px auto;
             padding: 15px;
@@ -55,36 +67,69 @@
             border-radius: 12px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 15px;
             max-width: 800px;
             width: 90%;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .movie-selector select {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
+        .selector-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .movie-selector label {
+            font-weight: bold;
+            min-width: 80px;
+            color: #ddd;
+        }
+
+        .movie-selector select,
+        .movie-selector input {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 6px;
             background: #1a1a1a;
             color: white;
             border: 1px solid #444;
-            font-size: 1.1em;
+            font-size: 1em;
             outline: none;
+        }
+
+        .btn-play {
+            padding: 10px 20px;
+            background: #f39c12;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-play:hover {
+            background: #e67e22;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            width: 100%;
         }
 
         .movie-info {
             display: flex;
             gap: 10px;
             align-items: flex-start;
-            margin-top: 10px;
+            margin-top: 5px;
         }
 
         .movie-poster {
-            width: 100px;
+            width: 80px;
             border-radius: 4px;
             display: none;
-            /* Hidden by default */
         }
     </style>
 </head>
@@ -95,11 +140,14 @@
     <div id="lobbyOverlay">
         <h1>🎬 Watch Party</h1>
         <p>مرحباً بك في الغرفة <span id="lobbyRoomName">...</span></p>
-        <button class="btn-join" onclick="joinRoom()">انضم للغرفة</button>
+
+        <input type="text" id="usernameInput" class="lobby-input" placeholder="أدخل اسمك هنا">
+
+        <button class="btn-join" onclick="joinRoom()">انضم للغرفة 🚀</button>
         <p style="margin-top: 10px; color: #888; font-size: 0.9em;">اضغط للبدء (مطلوب للمزامنة)</p>
     </div>
 
-    <!-- MAIN APP (Hidden initially) -->
+    <!-- MAIN APP -->
     <div class="room-container" id="appContainer" style="filter: blur(5px);">
         <!-- Video Section -->
         <div class="video-section">
@@ -110,13 +158,26 @@
                 </div>
             </div>
 
-            <!-- Library Selector -->
+            <!-- Library & Custom Link -->
             <div class="movie-selector">
-                <label>📚 مكتبة الأفلام:</label>
-                <select id="movieSelect" onchange="changeMovie()">
-                    <option value="" disabled selected>جاري تحميل المكتبة...</option>
-                </select>
+                <!-- Dropdown -->
+                <div class="selector-row">
+                    <label>📚 المكتبة:</label>
+                    <select id="movieSelect" onchange="changeMovie()">
+                        <option value="" disabled selected>جاري تحميل المكتبة...</option>
+                    </select>
+                </div>
 
+                <div class="divider"></div>
+
+                <!-- Custom Link -->
+                <div class="selector-row">
+                    <label>🔗 رابط خارجي:</label>
+                    <input type="text" id="customUrlInput" placeholder="https://example.com/video.mp4">
+                    <button class="btn-play" onclick="playCustomLink()">تشغيل</button>
+                </div>
+
+                <!-- Info Display -->
                 <div class="movie-info" id="movieInfo">
                     <img id="posterImg" class="movie-poster" src="" alt="Poster">
                     <div style="flex-grow: 1;">
@@ -156,9 +217,9 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const roomId = urlParams.get('room');
-        const username = urlParams.get('username');
+        let username = urlParams.get('username');
 
-        if (!roomId || !username) {
+        if (!roomId) {
             alert('معلومات الغرفة غير صحيحة');
             window.location.href = 'index.html';
         }
@@ -166,10 +227,18 @@
         document.getElementById('roomName').textContent = roomId;
         document.getElementById('lobbyRoomName').textContent = roomId;
 
+        // Setup Logic for Username
+        const usernameInput = document.getElementById('usernameInput');
+        if (username) {
+            usernameInput.value = username;
+            // Optional: Disable if locked via URL, or allow edit
+        }
+
         const video = document.getElementById('video');
         const chatMessages = document.getElementById('chatMessages');
         const syncIndicator = document.getElementById('syncIndicator');
         const movieSelect = document.getElementById('movieSelect');
+        const customUrlInput = document.getElementById('customUrlInput');
         const posterImg = document.getElementById('posterImg');
 
         let ws;
@@ -181,14 +250,20 @@
 
         // --- LOBBY LOGIC ---
         function joinRoom() {
-            // User interaction unlocked audio context here
+            const nameVal = usernameInput.value.trim();
+            if (!nameVal) {
+                alert("الرجاء إدخال اسمك");
+                return;
+            }
+            username = nameVal;
+
+            // Unlock Audio Context
             const overlay = document.getElementById('lobbyOverlay');
             overlay.style.opacity = '0';
             setTimeout(() => overlay.remove(), 500);
-
             document.getElementById('appContainer').style.filter = 'none';
 
-            // Start Connection
+            // Connect
             connectWebSocket();
         }
 
@@ -210,8 +285,14 @@
                 posterImg.style.display = 'none';
             }
 
-            // Select in dropdown if exists
-            syncDropdown(movie.id);
+            // Reset Inputs
+            if (movie.type === 'catalog') {
+                syncDropdown(movie.id);
+                customUrlInput.value = '';
+            } else {
+                movieSelect.selectedIndex = -1; // Deselect
+                customUrlInput.value = movie.url;
+            }
 
             if (Hls.isSupported() && url.includes('.m3u8')) {
                 if (hls) hls.destroy();
@@ -234,7 +315,6 @@
         }
 
         function syncDropdown(id) {
-            // Loop through options (including optgroups)
             for (let i = 0; i < movieSelect.options.length; i++) {
                 try {
                     const val = movieSelect.options[i].value;
@@ -246,34 +326,28 @@
                     }
                 } catch (e) { }
             }
-            pendingMovieId = id; // Store if not found (catalog loading?)
+            pendingMovieId = id;
         }
 
         // --- CATALOG LOGIC ---
         async function loadCatalog() {
             try {
-                const response = await fetch('/live/catalog.json'); // Nginx location
-                // Fallback to local file if Nginx route not set (for local dev without Nginx)
-                // In Docker it will be served via Nginx.
-
+                const response = await fetch('/live/catalog.json');
                 if (!response.ok) throw new Error('Failed to load catalog');
                 const uniqueCatalog = await response.json();
-
-                // Expecting array of categories: [{category: "Movies", items: []}, ...]
 
                 movieSelect.innerHTML = '<option value="" disabled selected>-- اختر للمشاهدة --</option>';
 
                 uniqueCatalog.forEach(cat => {
                     const group = document.createElement('optgroup');
                     group.label = cat.category;
-
                     cat.items.forEach(movie => {
+                        const m = { ...movie, type: 'catalog' };
                         const option = document.createElement('option');
-                        option.value = JSON.stringify(movie);
+                        option.value = JSON.stringify(m);
                         option.text = movie.name;
                         group.appendChild(option);
                     });
-
                     movieSelect.add(group);
                 });
 
@@ -294,11 +368,22 @@
             if (!isConnected) return;
             try {
                 const movie = JSON.parse(movieSelect.value);
-                ws.send(JSON.stringify({
-                    type: 'change-movie',
-                    movie: movie
-                }));
+                ws.send(JSON.stringify({ type: 'change-movie', movie }));
             } catch (e) { }
+        }
+
+        function playCustomLink() {
+            if (!isConnected) return;
+            const url = customUrlInput.value.trim();
+            if (!url) return alert("الرجاء إدخال رابط");
+
+            const movie = {
+                type: 'url',
+                url: url,
+                name: 'رابط خارجي 🔗',
+                id: 'custom-' + Date.now()
+            };
+            ws.send(JSON.stringify({ type: 'change-movie', movie }));
         }
 
         // --- WEBSOCKET ---
@@ -336,15 +421,15 @@
                     loadVideo(data.movie);
                     break;
                 case 'sync':
-                    if (data.username !== username) syncVideo(data);
+                    // Server excludes sender, so we ALWAYS apply sync if received
+                    syncVideo(data);
                     break;
                 case 'seek':
-                    if (data.username !== username) {
-                        isSyncing = true;
-                        video.currentTime = data.time;
-                        setTimeout(() => isSyncing = false, 500);
-                        showSyncIndicator(`${data.username} ⏩`);
-                    }
+                    // Server excludes sender
+                    isSyncing = true;
+                    video.currentTime = data.time;
+                    setTimeout(() => isSyncing = false, 500);
+                    showSyncIndicator(`${data.username} ⏩`);
                     break;
                 case 'chat':
                     addChatMessage(data.username, data.message);
@@ -361,7 +446,6 @@
         }
 
         function syncVideo(data) {
-            // Drift correction
             const diff = Math.abs(video.currentTime - data.time);
             if (diff > 2) video.currentTime = data.time;
 
@@ -410,7 +494,7 @@
         function addChatMessage(user, msg, own = false) {
             const div = document.createElement('div');
             div.className = `chat-message ${own ? 'own-message' : ''}`;
-            div.innerHTML = `<strong>${user}:</strong> ${msg}`; // Simple text
+            div.innerHTML = `<strong>${user}:</strong> ${msg}`;
             chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -421,7 +505,14 @@
             chatMessages.appendChild(div);
         }
         function updateUserCount(n) { document.getElementById('userCount').innerText = n; }
-        function copyRoomLink() { navigator.clipboard.writeText(location.href); alert('تم النسخ'); }
+
+        function copyRoomLink() {
+            // CLEAN LINK -> Remove username
+            const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+            navigator.clipboard.writeText(cleanUrl);
+            alert('تم نسخ الرابط! (بدون اسمك) 📋');
+        }
+
         function leaveRoom() { location.href = 'index.html'; }
     </script>
 </body>
