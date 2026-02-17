@@ -37,15 +37,29 @@ jobs:
             # Ensure media directory exists
             mkdir -p media
 
-            # Use curl with -g to disable globbing (fix for URLs with brackets) and -L to follow redirects
-            # -f fails on HTTP errors (404, 403, etc)
-            # -H User-Agent to mimic browser and bypass 403
-            curl -f -g -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o media/movie.mp4 "${{ parameters.videoUrl }}"
+            # -f fails on HTTP errors
+            # -g disables globbing
+            # -L follows redirects
+            # -k allows insecure SSL (for some file hosts)
+            # --retry 5 retries on transient errors
+            # -H User-Agent mimics browser
+            curl -f -g -L -k --retry 5 --retry-delay 5 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o media/movie.mp4 "${{ parameters.videoUrl }}"
 
             # Check if file is valid
             if [ ! -s media/movie.mp4 ]; then
               echo "Error: Downloaded file is empty or failed."
               exit 1
+            fi
+
+            # Check if it's actually a video (and not an HTML error page)
+            FILE_TYPE=$(file --mime-type -b media/movie.mp4)
+            echo "Downloaded file type: $FILE_TYPE"
+            if [[ "$FILE_TYPE" == "text/html"* ]] || [[ "$FILE_TYPE" == "text/plain"* ]]; then
+               echo "❌ Error: The link returned a Text/HTML page instead of a video file."
+               echo "This usually means it's not a 'Direct Link'. Please make sure the link ends with .mp4 or triggers a download directly."
+               echo "File content preview:"
+               head -n 10 media/movie.mp4
+               exit 1
             fi
 
             # Convert
