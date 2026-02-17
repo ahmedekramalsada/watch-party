@@ -82,13 +82,19 @@ jobs:
 
             # 4. Update Catalog (Using Node.js)
             echo "📚 Updating Catalog..."
+            export MOVIE_NAME="$MOVIE_NAME" # Ensure available to node
+            export SAFE_NAME="$SAFE_NAME"
+
             node -e "
             const fs = require('fs');
             const path = 'media/catalog.json';
+            const safeName = process.env.SAFE_NAME;
+            const movieName = process.env.MOVIE_NAME;
+
             const newMovie = {
-                id: '$SAFE_NAME',
-                name: '$MOVIE_NAME',
-                path: '$SAFE_NAME/playlist.m3u8',
+                id: safeName,
+                name: movieName,
+                path: safeName + '/playlist.m3u8',
                 addedAt: new Date().toISOString()
             };
 
