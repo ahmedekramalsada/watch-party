@@ -1,39 +1,31 @@
-FROM node:22-alpine AS builder
+FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy backend
-COPY backend/package*.json ./backend/
-RUN cd backend && npm install
-
-# Copy frontend
-COPY frontend ./frontend
-COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm install && npm run build
-
-# Final stage
-FROM node:22-alpine
-
-WORKDIR /app
-
-# Install nginx
+# Install Nginx
 RUN apk add --no-cache nginx
 
-# Copy backend from builder
-COPY --from=builder /app/backend ./backend
+# Setup Backend
+COPY backend/package*.json ./backend/
+RUN cd backend && npm install --production
+COPY backend/server.js ./backend/
 
-# Copy built frontend
-COPY --from=builder /app/frontend/dist ./frontend/dist
+# Setup Frontend (Vanilla JS - No build needed)
+COPY frontend /usr/share/nginx/html
 
-# Copy nginx config
+# Setup Media
+# Since we are one container, frontend serves media from /live
+# Nginx config aliases /live/ -> /usr/share/nginx/html/live/
+COPY media /usr/share/nginx/html/live
+
+# Nginx Config
 COPY zeabur-nginx.conf /etc/nginx/nginx.conf
 
-# Create startup script
-RUN echo '#!/bin/sh\n\
-cd /app/backend && node server.js &\n\
-nginx -g "daemon off;"\n\
-' > /start.sh && chmod +x /start.sh
+# Startup Script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
+# Expose Zeabur Port
 EXPOSE 8080
 
 CMD ["/start.sh"]
