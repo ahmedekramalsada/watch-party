@@ -9,22 +9,38 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         .movie-selector {
-            margin: 10px 0;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+            margin: 15px auto;
+            padding: 12px;
+            background: rgba(42, 42, 42, 0.8);
+            border-radius: 12px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
+            gap: 12px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .movie-selector label {
+            white-space: nowrap;
+            font-weight: bold;
         }
 
         .movie-selector select {
             flex-grow: 1;
-            padding: 8px;
-            border-radius: 4px;
-            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 6px;
+            background: #1a1a1a;
             color: white;
             border: 1px solid #444;
+            max-width: 100%;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .movie-selector select:hover {
+            border-color: #666;
         }
     </style>
 </head>
