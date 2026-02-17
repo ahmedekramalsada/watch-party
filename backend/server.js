@@ -126,6 +126,43 @@ wss.on('connection', (ws) => {
           }
           break;
 
+
+        case 'buffering':
+          if (currentRoom) {
+            const room = getRoom(currentRoom);
+            // Broadcast buffering status to everyone (including sender)
+            room.clients.forEach(client => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                  type: 'buffering',
+                  username: username,
+                  action: message.action // 'start' or 'end'
+                }));
+              }
+            });
+          }
+          break;
+
+        case 'force-sync':
+          if (currentRoom) {
+            const room = getRoom(currentRoom);
+            room.state.time = message.time;
+            room.state.action = message.action;
+
+            // Broadcast to EVERYONE (including sender to confirm)
+            room.clients.forEach(client => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                  type: 'force-sync',
+                  time: message.time,
+                  action: message.action,
+                  username: username
+                }));
+              }
+            });
+          }
+          break;
+
         case 'seek':
           if (currentRoom) {
             const room = getRoom(currentRoom);

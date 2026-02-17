@@ -195,6 +195,7 @@
             </div>
 
             <div class="video-controls">
+                <button class="btn btn-small" onclick="forceSync()">⚡ مزامنة إجبارية</button>
                 <button class="btn btn-small" onclick="copyRoomLink()">📋 نسخ رابط الغرفة</button>
                 <button class="btn btn-small btn-danger" onclick="leaveRoom()">🚪 مغادرة</button>
             </div>
@@ -231,7 +232,6 @@
         const usernameInput = document.getElementById('usernameInput');
         if (username) {
             usernameInput.value = username;
-            // Optional: Disable if locked via URL, or allow edit
         }
 
         const video = document.getElementById('video');
@@ -244,6 +244,7 @@
         let ws;
         let isConnected = false;
         let isSyncing = false;
+        let isBuffering = false;
         let hls;
         let currentMovie = null;
         let pendingMovieId = null;
@@ -421,11 +422,28 @@
                     loadVideo(data.movie);
                     break;
                 case 'sync':
-                    // Server excludes sender, so we ALWAYS apply sync if received
-                    syncVideo(data);
+                    if (!isBuffering) syncVideo(data);
+                    break;
+                case 'force-sync':
+                    isSyncing = true;
+                    video.currentTime = data.time;
+                    if (data.action === 'play') video.play().catch(() => { });
+                    else video.pause();
+                    setTimeout(() => isSyncing = false, 1000);
+                    showSyncIndicator(`⚡ مزامنة إجبارية من ${data.username}`);
+                    break;
+                case 'buffering':
+                    if (data.action === 'start') {
+                        isBuffering = true;
+                        video.pause();
+                        showSyncIndicator(`⏳ ${data.username} يواجه بطئاً...`);
+                    } else {
+                        isBuffering = false;
+                        video.play().catch(() => { });
+                        showSyncIndicator(`▶️ استئناف`);
+                    }
                     break;
                 case 'seek':
-                    // Server excludes sender
                     isSyncing = true;
                     video.currentTime = data.time;
                     setTimeout(() => isSyncing = false, 500);
@@ -459,7 +477,7 @@
         function showSyncIndicator(msg) {
             syncIndicator.textContent = msg;
             syncIndicator.style.display = 'block';
-            setTimeout(() => syncIndicator.style.display = 'none', 1000);
+            // Clear previous timeout logic handled by CSS or quick overwrite
         }
 
         // --- EVENTS ---
@@ -471,12 +489,42 @@
             }
         };
 
+        // Buffering Events
+        let bufferTimeout;
+        video.onwaiting = () => {
+            if (isConnected && !isBuffering) {
+                // Debounce slightly to avoid flicker
+                bufferTimeout = setTimeout(() => {
+                    ws.send(JSON.stringify({ type: 'buffering', action: 'start' }));
+                }, 500);
+            }
+        };
+
+        video.onplaying = () => {
+            if (bufferTimeout) clearTimeout(bufferTimeout);
+            if (isConnected && isBuffering) {
+                // We were buffering, now we are good
+                ws.send(JSON.stringify({ type: 'buffering', action: 'end' }));
+            }
+        };
+
         function sendSync(action) {
-            if (!isSyncing && isConnected) {
+            if (!isSyncing && isConnected && !isBuffering) {
                 ws.send(JSON.stringify({
                     type: 'sync', action, time: video.currentTime
                 }));
             }
+        }
+
+        function forceSync() {
+            if (!isConnected) return;
+            const action = video.paused ? 'pause' : 'play';
+            ws.send(JSON.stringify({
+                type: 'force-sync',
+                time: video.currentTime,
+                action: action
+            }));
+            showSyncIndicator('⚡ تم فرض المزامنة');
         }
 
         // --- UTILS ---
@@ -507,7 +555,6 @@
         function updateUserCount(n) { document.getElementById('userCount').innerText = n; }
 
         function copyRoomLink() {
-            // CLEAN LINK -> Remove username
             const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
             navigator.clipboard.writeText(cleanUrl);
             alert('تم نسخ الرابط! (بدون اسمك) 📋');
