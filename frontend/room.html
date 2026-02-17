@@ -10,24 +10,34 @@
     <style>
         .movie-selector {
             margin: 15px auto;
-            padding: 12px;
-            background: rgba(42, 42, 42, 0.8);
+            padding: 15px;
+            background: rgba(42, 42, 42, 0.9);
             border-radius: 12px;
             display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-direction: column;
             gap: 12px;
             max-width: 600px;
             width: 90%;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .selector-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
         }
 
         .movie-selector label {
             white-space: nowrap;
             font-weight: bold;
+            color: #ddd;
+            min-width: 80px;
         }
 
-        .movie-selector select {
+        .movie-selector select,
+        .movie-selector input {
             flex-grow: 1;
             padding: 10px;
             border-radius: 6px;
@@ -35,12 +45,35 @@
             color: white;
             border: 1px solid #444;
             max-width: 100%;
-            cursor: pointer;
             outline: none;
+            transition: border-color 0.2s;
         }
 
-        .movie-selector select:hover {
-            border-color: #666;
+        .movie-selector select:hover,
+        .movie-selector input:focus {
+            border-color: #f39c12;
+        }
+
+        .btn-play {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn-play:hover {
+            background: #e67e22;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            width: 100%;
+            margin: 5px 0;
         }
     </style>
 </head>
@@ -56,16 +89,28 @@
                 </div>
             </div>
 
-            <!-- Movie Selector -->
+            <!-- Enhanced Movie Selector -->
             <div class="movie-selector">
-                <label>🎬 الفيلم:</label>
-                <select id="movieSelect" onchange="changeMovie()">
-                    <option value="" disabled selected>جاري تحميل القائمة...</option>
-                </select>
+                <!-- Dropdown -->
+                <div class="selector-row">
+                    <label>📚 المكتبة:</label>
+                    <select id="movieSelect" onchange="changeCatalogMovie()">
+                        <option value="" disabled selected>جاري تحميل القائمة...</option>
+                    </select>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Direct Link -->
+                <div class="selector-row">
+                    <label>🔗 رابط مباشر:</label>
+                    <input type="text" id="directLinkInput" placeholder="https://example.com/video.mp4">
+                    <button class="btn-play" onclick="playDirectLink()">تشغيل</button>
+                </div>
             </div>
 
             <div class="video-wrapper">
-                <video id="video" controls autoplay></video>
+                <video id="video" controls autoplay playsinline></video>
                 <div class="sync-indicator" id="syncIndicator">
                     🔄 جاري المزامنة...
                 </div>
@@ -106,99 +151,128 @@
         const chatMessages = document.getElementById('chatMessages');
         const syncIndicator = document.getElementById('syncIndicator');
         const movieSelect = document.getElementById('movieSelect');
+        const directLinkInput = document.getElementById('directLinkInput');
 
         let ws;
         let isConnected = false;
         let isSyncing = false;
         let hls;
-        let currentMoviePath = '';
+        let currentMovieSource = null; // Object { type: 'catalog'|'url', ... }
         let pendingMovieId = null;
 
-        // Initialize HLS
-        function loadVideo(path) {
-            if (path === currentMoviePath) return; // Don't reload if same
+        // Initialize Player logic
+        function loadVideoSource(movie) {
+            if (currentMovieSource && currentMovieSource.type === movie.type && currentMovieSource.path === movie.path && currentMovieSource.url === movie.url) {
+                return; // Prevent reload if same content
+            }
 
-            currentMoviePath = path;
-            const fullPath = `/live/${path}`;
-            console.log('Loading video:', fullPath);
+            currentMovieSource = movie;
+            let videoUrl = '';
 
-            if (Hls.isSupported()) {
-                if (hls) hls.destroy(); // Destroy previous instance
+            if (movie.type === 'catalog') {
+                videoUrl = `/live/${movie.path}`;
+                movieSelect.value = JSON.stringify(movie); // Sync UI
+                directLinkInput.value = ''; // Clear URL input
+            } else if (movie.type === 'url') {
+                videoUrl = movie.url;
+                movieSelect.selectedIndex = -1; // Deselect catalog
+                directLinkInput.value = movie.url; // Sync UI
+            }
 
-                hls = new Hls({
-                    enableWorker: true,
-                    lowLatencyMode: true,
-                });
-                hls.loadSource(fullPath);
+            console.log('Loading video:', videoUrl);
+
+            // Determine if HLS or direct
+            const isHLS = videoUrl.includes('.m3u8');
+
+            if (Hls.isSupported() && isHLS) {
+                if (hls) hls.destroy();
+                hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+                hls.loadSource(videoUrl);
                 hls.attachMedia(video);
-
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    console.log('HLS manifest loaded');
-                    addSystemMessage('الفيلم جاهز للتشغيل 🎬');
+                    addSystemMessage(`تم تشغيل: ${movie.name} 🎬`);
                 });
-
-                hls.on(Hls.Events.ERROR, (event, data) => {
-                    if (data.fatal) {
-                        console.error('HLS error:', data);
-                        addSystemMessage('خطأ في تحميل الفيلم attempt to recover...');
-                        hls.startLoad();
-                    }
-                });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = fullPath;
+                hls.on(Hls.Events.ERROR, (e, data) => handleHlsError(data));
+            } else {
+                if (hls) { hls.destroy(); hls = null; }
+                video.src = videoUrl;
+                addSystemMessage(`تم تشغيل: ${movie.name} 🎬`);
             }
         }
 
-        // Fetch Catalog
+        function handleHlsError(data) {
+            if (data.fatal) {
+                console.error('HLS error:', data);
+                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                    addSystemMessage('❌ خطأ في الشبكة - تأكد من الرابط أو الكورس (CORS)');
+                } else {
+                    hls.startLoad();
+                }
+            }
+        }
+
+        // --- Catalog Logic ---
         async function loadCatalog() {
             try {
                 const response = await fetch('/live/catalog.json');
-                if (!response.ok) throw new Error('Failed to load catalog');
+                if (!response.ok) throw new Error('Failed');
                 const catalog = await response.json();
 
                 movieSelect.innerHTML = '';
                 if (catalog.length === 0) {
                     const option = document.createElement('option');
-                    option.text = "لا يوجد أفلام متاحة";
+                    option.text = "المكتبة فارغة";
                     movieSelect.add(option);
-                    return;
+                } else {
+                    const defaultOption = document.createElement('option');
+                    defaultOption.text = "-- اختر من المكتبة --";
+                    defaultOption.value = "";
+                    defaultOption.disabled = true;
+                    defaultOption.selected = true;
+                    movieSelect.add(defaultOption);
+
+                    catalog.forEach(item => {
+                        const movie = { ...item, type: 'catalog' };
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify(movie);
+                        option.text = movie.name;
+                        movieSelect.add(option);
+                    });
                 }
 
-                catalog.forEach(movie => {
-                    const option = document.createElement('option');
-                    option.value = JSON.stringify(movie); // Store full object
-                    option.text = movie.name;
-                    movieSelect.add(option);
-                });
-
-                // Apply pending movie if exists (from server state)
+                // If pending ID exists from server state
                 if (pendingMovieId) {
-                    updateSelector(pendingMovieId);
-                    // Also load the video if not loaded yet
-                    const pendingMovie = catalog.find(m => m.id === pendingMovieId);
-                    if (pendingMovie) {
-                        loadVideo(pendingMovie.path);
-                    }
+                    selectCatalogMovieById(pendingMovieId);
                     pendingMovieId = null;
                 }
-                // Default to first movie if no state from server yet and nothing selected
-                else if (!currentMoviePath && catalog.length > 0) {
-                    const firstMovie = catalog[0];
-                    loadVideo(firstMovie.path);
-                    // We select it in dropdown but DON'T send change-movie to server
-                    // This creates a local defaults without overwriting other users
-                    updateSelector(firstMovie.id);
-                }
+                // If no server state yet, default to first item locally (optional, maybe wait for user)
 
             } catch (err) {
-                console.error('Error loading catalog:', err);
+                console.error(err);
                 movieSelect.innerHTML = '<option>فشل تحميل القائمة</option>';
+            }
+        }
+
+        function selectCatalogMovieById(id) {
+            for (let i = 0; i < movieSelect.options.length; i++) {
+                try {
+                    const val = movieSelect.options[i].value;
+                    if (!val) continue;
+                    const movie = JSON.parse(val);
+                    if (movie.id === id) {
+                        movieSelect.selectedIndex = i;
+                        // Don't trigger change event, just UI update
+                        break;
+                    }
+                } catch (e) { }
             }
         }
 
         loadCatalog();
 
-        function changeMovie() {
+        // --- User Actions ---
+
+        function changeCatalogMovie() {
             if (!isConnected) return;
             try {
                 const selectedMovie = JSON.parse(movieSelect.value);
@@ -206,23 +280,37 @@
                     type: 'change-movie',
                     movie: selectedMovie
                 }));
-            } catch (e) { console.error(e); }
+            } catch (e) { }
         }
 
-        // WebSocket connection
+        function playDirectLink() {
+            if (!isConnected) return;
+            const url = directLinkInput.value.trim();
+            if (!url) return alert('الرجاء إدخال رابط');
+
+            const movie = {
+                type: 'url',
+                url: url,
+                name: 'فيديو خارجي 🔗',
+                id: 'url-' + Date.now()
+            };
+
+            ws.send(JSON.stringify({
+                type: 'change-movie',
+                movie: movie
+            }));
+        }
+
+        // --- WebSocket ---
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
             ws.onopen = () => {
-                console.log('WebSocket connected');
+                console.log('Connected');
                 isConnected = true;
-                ws.send(JSON.stringify({
-                    type: 'join',
-                    roomId: roomId,
-                    username: username
-                }));
-                addSystemMessage('انت دلوقتي متصل! 🎉');
+                ws.send(JSON.stringify({ type: 'join', roomId, username }));
+                addSystemMessage('تم الاتصال بالسيرفر 🟢');
             };
 
             ws.onmessage = (event) => {
@@ -231,14 +319,9 @@
             };
 
             ws.onclose = () => {
-                console.log('WebSocket disconnected');
                 isConnected = false;
-                addSystemMessage('الاتصال انقطع - جاري إعادة المحاولة...');
+                addSystemMessage('🔴 انقطع الاتصال - جاري المحاولة...');
                 setTimeout(connectWebSocket, 3000);
-            };
-
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
             };
         }
 
@@ -246,30 +329,28 @@
             switch (data.type) {
                 case 'state':
                     if (data.currentMovie) {
-                        loadVideo(data.currentMovie.path);
-                        updateSelector(data.currentMovie.id);
+                        loadVideoSource(data.currentMovie);
                     } else {
-                        // If null state, we depend on loadCatalog logic to pick default
+                        // If no movie selected by server, maybe hint user
                     }
                     syncVideoState(data);
                     break;
 
                 case 'movie-changed':
-                    addSystemMessage(`🎬 ${data.username} غير الفيلم إلى: ${data.movie.name}`);
-                    loadVideo(data.movie.path);
-                    updateSelector(data.movie.id);
+                    addSystemMessage(`🎬 ${data.username} شغل: ${data.movie.name}`);
+                    loadVideoSource(data.movie);
                     break;
 
                 case 'sync':
                     if (data.username !== username) {
-                        showSyncIndicator(`${data.username} قام بـ ${data.action === 'play' ? 'تشغيل' : 'إيقاف'} الفيديو`);
+                        showSyncIndicator(`${data.username} ${data.action === 'play' ? '▶️' : '⏸️'}`);
                         syncVideoState(data);
                     }
                     break;
 
                 case 'seek':
                     if (data.username !== username) {
-                        showSyncIndicator(`${data.username} قفز للثانية ${Math.floor(data.time)}`);
+                        showSyncIndicator(`${data.username} ⏩ ${Math.floor(data.time)}s`);
                         isSyncing = true;
                         video.currentTime = data.time;
                         setTimeout(() => isSyncing = false, 500);
@@ -281,131 +362,75 @@
                     break;
 
                 case 'user-joined':
-                    addSystemMessage(`${data.username} انضم للغرفة 👋`);
+                    addSystemMessage(`${data.username} انضم 👋`);
                     updateUserCount(data.userCount);
                     break;
 
                 case 'user-left':
-                    addSystemMessage(`${data.username} غادر الغرفة 👋`);
+                    addSystemMessage(`${data.username} غادر 👋`);
                     updateUserCount(data.userCount);
                     break;
-            }
-        }
-
-        function updateSelector(movieId) {
-            let found = false;
-            // Find option with this movie ID and select it
-            for (let i = 0; i < movieSelect.options.length; i++) {
-                try {
-                    // Check if value is valid JSON
-                    if (!movieSelect.options[i].value) continue;
-
-                    const movie = JSON.parse(movieSelect.options[i].value);
-                    if (movie.id === movieId) {
-                        movieSelect.selectedIndex = i;
-                        found = true;
-                        break;
-                    }
-                } catch (e) { }
-            }
-
-            if (!found) {
-                pendingMovieId = movieId;
             }
         }
 
         function syncVideoState(data) {
             isSyncing = true;
-
             const timeDiff = Math.abs(video.currentTime - data.time);
-            if (timeDiff > 2) {
-                video.currentTime = data.time;
-            }
+            if (timeDiff > 2) video.currentTime = data.time;
 
             if (data.action === 'play' && video.paused) {
-                video.play().catch(e => console.log('Autoplay prevented:', e));
+                video.play().catch(e => console.log('Autoplay blocked:', e));
             } else if (data.action === 'pause' && !video.paused) {
                 video.pause();
             }
-
             setTimeout(() => isSyncing = false, 500);
         }
 
         function showSyncIndicator(message) {
             syncIndicator.textContent = message;
             syncIndicator.style.display = 'block';
-            setTimeout(() => {
-                syncIndicator.style.display = 'none';
-            }, 2000);
+            setTimeout(() => syncIndicator.style.display = 'none', 1500);
         }
 
-        // Video event listeners
+        // --- Video Events ---
         video.addEventListener('play', () => {
-            if (!isSyncing && isConnected) {
-                ws.send(JSON.stringify({
-                    type: 'sync',
-                    action: 'play',
-                    time: video.currentTime
-                }));
-            }
+            if (!isSyncing && isConnected) ws.send(JSON.stringify({ type: 'sync', action: 'play', time: video.currentTime }));
         });
-
         video.addEventListener('pause', () => {
-            if (!isSyncing && isConnected) {
-                ws.send(JSON.stringify({
-                    type: 'sync',
-                    action: 'pause',
-                    time: video.currentTime
-                }));
-            }
+            if (!isSyncing && isConnected) ws.send(JSON.stringify({ type: 'sync', action: 'pause', time: video.currentTime }));
         });
-
         video.addEventListener('seeked', () => {
-            if (!isSyncing && isConnected) {
-                ws.send(JSON.stringify({
-                    type: 'seek',
-                    time: video.currentTime
-                }));
-            }
+            if (!isSyncing && isConnected) ws.send(JSON.stringify({ type: 'seek', time: video.currentTime }));
         });
 
-        // Chat functions
+        // --- Chat & Utils ---
         function sendMessage() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
-
             if (message && isConnected) {
-                ws.send(JSON.stringify({
-                    type: 'chat',
-                    message: message
-                }));
+                ws.send(JSON.stringify({ type: 'chat', message }));
                 addChatMessage(username + ' (أنت)', message, true);
                 input.value = '';
             }
         }
 
         function handleMessageKeypress(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
+            if (event.key === 'Enter') sendMessage();
         }
 
         function addChatMessage(user, message, isOwn = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-message ${isOwn ? 'own-message' : ''}`;
-            messageDiv.innerHTML = `
-                <span class="message-user">${user}:</span>
-                <span class="message-text">${escapeHtml(message)}</span>
-            `;
-            chatMessages.appendChild(messageDiv);
+            const div = document.createElement('div');
+            div.className = `chat-message ${isOwn ? 'own-message' : ''}`;
+            div.innerHTML = `<span class="message-user">${user}:</span><span class="message-text">${escapeHtml(message)}</span>`;
+            chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         function addSystemMessage(message) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'chat-message system-message';
-            messageDiv.innerHTML = `<span class="message-text">${message}</span>`;
-            chatMessages.appendChild(messageDiv);
+            const div = document.createElement('div');
+            div.className = 'chat-message system-message';
+            div.innerHTML = `<span class="message-text">${message}</span>`;
+            chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
@@ -414,14 +439,11 @@
         }
 
         function copyRoomLink() {
-            const link = window.location.href;
-            navigator.clipboard.writeText(link).then(() => {
-                alert('تم نسخ الرابط! شاركه مع أصدقائك 🎉');
-            });
+            navigator.clipboard.writeText(window.location.href).then(() => alert('تم النسخ! 📋'));
         }
 
         function leaveRoom() {
-            if (confirm('متأكد إنك عايز تسيب الغرفة؟')) {
+            if (confirm('تغادر؟')) {
                 ws.close();
                 window.location.href = 'index.html';
             }
@@ -433,7 +455,6 @@
             return div.innerHTML;
         }
 
-        // Initialize
         connectWebSocket();
     </script>
 </body>

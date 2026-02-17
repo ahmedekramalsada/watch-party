@@ -82,6 +82,7 @@ wss.on('connection', (ws) => {
         case 'change-movie':
           if (currentRoom) {
             const room = getRoom(currentRoom);
+            // message.movie can be { type: 'catalog', ... } or { type: 'url', url: '...' }
             room.state.currentMovie = message.movie;
             room.state.time = 0;
             room.state.action = 'pause';
