@@ -14,8 +14,8 @@ jobs:
     displayName: "Download and Convert Movie"
     steps:
       - checkout: self
-        persistCredentials: true
-        fetchDepth: 1
+        persistCredentials: "true"
+        fetchDepth: "1"
 
       - task: Bash@3
         displayName: "Install FFmpeg"
@@ -39,7 +39,8 @@ jobs:
 
             # Use curl with -g to disable globbing (fix for URLs with brackets) and -L to follow redirects
             # -f fails on HTTP errors (404, 403, etc)
-            curl -f -g -L -o media/movie.mp4 "${{ parameters.videoUrl }}"
+            # -H User-Agent to mimic browser and bypass 403
+            curl -f -g -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o media/movie.mp4 "${{ parameters.videoUrl }}"
 
             # Check if file is valid
             if [ ! -s media/movie.mp4 ]; then
