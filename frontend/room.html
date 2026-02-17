@@ -474,10 +474,16 @@
             }
         }
 
+        let syncTimeout;
         function showSyncIndicator(msg) {
+            if (syncTimeout) clearTimeout(syncTimeout);
+
             syncIndicator.textContent = msg;
             syncIndicator.style.display = 'block';
-            // Clear previous timeout logic handled by CSS or quick overwrite
+
+            syncTimeout = setTimeout(() => {
+                syncIndicator.style.display = 'none';
+            }, 4000); // 4 seconds timeout
         }
 
         // --- EVENTS ---
