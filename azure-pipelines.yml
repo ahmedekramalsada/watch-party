@@ -1,128 +1,34 @@
-trigger: none
-
-parameters:
-  - name: videoUrl
-    displayName: "Direct Link to Video (MP4/MKV)"
-    type: string
-    default: ""
-  - name: movieName
-    displayName: "Movie Name (e.g. The Matrix)"
-    type: string
-    default: "New Movie"
+trigger:
+  - main
 
 pool:
   vmImage: "ubuntu-latest"
 
 jobs:
-  - job: UpdateMovie
-    displayName: "Download and Convert Movie"
+  - job: BuildAndPackage
+    displayName: "Build and Package App"
     steps:
-      - checkout: self
-        persistCredentials: "true"
-        fetchDepth: "1"
-
-      - task: Bash@3
-        displayName: "Install FFmpeg"
+      - task: NodeTool@0
         inputs:
-          targetType: "inline"
-          script: |
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
+          versionSpec: "18.x"
+        displayName: "Install Node.js"
 
-      - task: Bash@3
-        displayName: "Download, Convert & Update Catalog"
-        env:
-          VIDEO_URL: ${{ parameters.videoUrl }}
-          MOVIE_NAME: ${{ parameters.movieName }}
+      - script: |
+          npm install
+        displayName: "Install Dependencies"
+
+      - task: ArchiveFiles@2
+        displayName: "Archive Files for Deployment"
         inputs:
-          targetType: "inline"
-          script: |
-            set -e
+          rootFolderOrFile: "$(System.DefaultWorkingDirectory)"
+          includeRootFolder: false
+          archiveType: "zip"
+          archiveFile: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip"
+          replaceExistingArchive: true
 
-            # 1. Sanitize Movie Name for folder (e.g. "The Matrix!" -> "the-matrix")
-            SAFE_NAME=$(echo "$MOVIE_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-+/-/g' | sed 's/^-//' | sed 's/-$//')
-
-            if [ -z "$SAFE_NAME" ]; then
-                SAFE_NAME="movie-$(date +%s)"
-            fi
-
-            TARGET_DIR="media/$SAFE_NAME"
-            echo "🎥 Preparing movie: $MOVIE_NAME"
-            echo "📂 Target directory: $TARGET_DIR"
-
-            mkdir -p "$TARGET_DIR"
-
-            # 2. Download Video
-            echo "⬇️ Downloading video..."
-            curl -f -g -L -k --retry 5 --retry-delay 5 --connect-timeout 60 \
-                 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-                 -o "$TARGET_DIR/source.mp4" "$VIDEO_URL"
-
-            # Check validity
-            if [ ! -s "$TARGET_DIR/source.mp4" ]; then
-              echo "❌ Error: Download failed."
-              exit 1
-            fi
-
-            FILE_TYPE=$(file --mime-type -b "$TARGET_DIR/source.mp4")
-            echo "📄 File type: $FILE_TYPE"
-            if [[ "$FILE_TYPE" == "text/html"* ]] || [[ "$FILE_TYPE" == "text/plain"* ]]; then
-               echo "❌ Error: Link returned HTML/Text instead of video."
-               exit 1
-            fi
-
-            # 3. Convert to HLS
-            echo "⚙️ Converting to HLS..."
-            cd "$TARGET_DIR"
-            ffmpeg -i source.mp4 -c:v libx264 -c:a aac -f hls -hls_time 10 -hls_list_size 0 -hls_segment_filename "segment_%03d.ts" playlist.m3u8 || exit 1
-
-            # Remove source
-            rm source.mp4
-            cd ../..
-
-            # 4. Update Catalog (Using Node.js)
-            echo "📚 Updating Catalog..."
-            export MOVIE_NAME="$MOVIE_NAME" # Ensure available to node
-            export SAFE_NAME="$SAFE_NAME"
-
-            node -e "
-            const fs = require('fs');
-            const path = 'media/catalog.json';
-            const safeName = process.env.SAFE_NAME;
-            const movieName = process.env.MOVIE_NAME;
-
-            const newMovie = {
-                id: safeName,
-                name: movieName,
-                path: safeName + '/playlist.m3u8',
-                addedAt: new Date().toISOString()
-            };
-
-            let catalog = [];
-            if (fs.existsSync(path)) {
-                try {
-                    catalog = JSON.parse(fs.readFileSync(path, 'utf8'));
-                } catch (e) { console.log('⚠️ Error reading catalog, starting fresh.'); }
-            }
-
-            // Remove existing entry with same ID if exists
-            catalog = catalog.filter(m => m.id !== newMovie.id);
-            // Add new movie to top
-            catalog.unshift(newMovie);
-
-            fs.writeFileSync(path, JSON.stringify(catalog, null, 2));
-            console.log('✅ Catalog updated:', JSON.stringify(newMovie, null, 2));
-            "
-
-      - task: Bash@3
-        displayName: "Commit and Push"
+      - task: PublishBuildArtifacts@1
+        displayName: "Publish Artifact"
         inputs:
-          targetType: "inline"
-          script: |
-            git config --global user.email "azure-pipeline@watchparty.local"
-            git config --global user.name "Watch Party Bot"
-
-            git add media/
-            git commit -m "Add movie: ${{ parameters.movieName }}" || echo "No changes to commit"
-
-            git push origin HEAD:$(Build.SourceBranchName)
+          PathtoPublish: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip"
+          ArtifactName: "drop"
+          publishLocation: "Container"
