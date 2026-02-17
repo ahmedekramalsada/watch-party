@@ -35,8 +35,8 @@ jobs:
             # Ensure media directory exists
             mkdir -p media
 
-            # Use curl with -L to follow redirects
-            curl -L -o media/movie.mp4 "${{ parameters.videoUrl }}"
+            # Use curl with -g to disable globbing (fix for URLs with brackets) and -L to follow redirects
+            curl -g -L -o media/movie.mp4 "${{ parameters.videoUrl }}"
 
             # Check if file is valid
             if [ ! -s media/movie.mp4 ]; then
