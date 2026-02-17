@@ -1,6 +1,7 @@
 const http = require('http');
 const WebSocket = require('ws');
 const port = process.env.PORT || 3000;
+
 const server = http.createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200);
@@ -10,7 +11,9 @@ const server = http.createServer((req, res) => {
     res.end();
   }
 });
+
 const wss = new WebSocket.Server({ server });
+
 // Store rooms and their states
 const rooms = new Map();
 
@@ -20,7 +23,8 @@ function getRoom(roomId) {
       state: {
         action: 'pause',
         time: 0,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        currentMovie: null
       },
       clients: new Set(),
       users: new Map() // username -> client
@@ -75,13 +79,29 @@ wss.on('connection', (ws) => {
           console.log(`${username} joined room ${currentRoom}`);
           break;
 
+        case 'change-movie':
+          if (currentRoom) {
+            const room = getRoom(currentRoom);
+            room.state.currentMovie = message.movie;
+            room.state.time = 0;
+            room.state.action = 'pause';
+
+            broadcastToRoom(currentRoom, {
+              type: 'movie-changed',
+              movie: message.movie,
+              username
+            });
+          }
+          break;
+
         case 'sync':
           if (currentRoom) {
             const room = getRoom(currentRoom);
             room.state = {
               action: message.action,
               time: message.time,
-              timestamp: Date.now()
+              timestamp: Date.now(),
+              currentMovie: room.state.currentMovie
             };
 
             broadcastToRoom(currentRoom, {
@@ -150,6 +170,7 @@ wss.on('connection', (ws) => {
     console.error('WebSocket error:', error);
   });
 });
+
 server.listen(port, () => {
   console.log(`Server is listening on port ${port}`);
-});  
+});

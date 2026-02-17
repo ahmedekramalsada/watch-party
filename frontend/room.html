@@ -1,12 +1,34 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Watch Party Room 🎬</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        .movie-selector {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .movie-selector select {
+            flex-grow: 1;
+            padding: 8px;
+            border-radius: 4px;
+            background: #2a2a2a;
+            color: white;
+            border: 1px solid #444;
+        }
+    </style>
 </head>
+
 <body class="room-page">
     <div class="room-container">
         <!-- Video Section -->
@@ -17,6 +39,15 @@
                     <span id="userCount">0</span> 👥
                 </div>
             </div>
+
+            <!-- Movie Selector -->
+            <div class="movie-selector">
+                <label>🎬 الفيلم:</label>
+                <select id="movieSelect" onchange="changeMovie()">
+                    <option value="" disabled selected>جاري تحميل القائمة...</option>
+                </select>
+            </div>
+
             <div class="video-wrapper">
                 <video id="video" controls autoplay></video>
                 <div class="sync-indicator" id="syncIndicator">
@@ -36,7 +67,8 @@
             </div>
             <div class="chat-messages" id="chatMessages"></div>
             <div class="chat-input">
-                <input type="text" id="messageInput" placeholder="اكتب رسالة..." onkeypress="handleMessageKeypress(event)">
+                <input type="text" id="messageInput" placeholder="اكتب رسالة..."
+                    onkeypress="handleMessageKeypress(event)">
                 <button class="btn btn-primary" onclick="sendMessage()">إرسال</button>
             </div>
         </div>
@@ -57,35 +89,108 @@
         const video = document.getElementById('video');
         const chatMessages = document.getElementById('chatMessages');
         const syncIndicator = document.getElementById('syncIndicator');
+        const movieSelect = document.getElementById('movieSelect');
 
         let ws;
         let isConnected = false;
         let isSyncing = false;
+        let hls;
+        let currentMoviePath = '';
+        let pendingMovieId = null;
 
         // Initialize HLS
-        if (Hls.isSupported()) {
-            const hls = new Hls({
-                enableWorker: true,
-                lowLatencyMode: true,
-            });
-            hls.loadSource('/live/movie.m3u8');
-            hls.attachMedia(video);
-            
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                console.log('HLS manifest loaded');
-                addSystemMessage('الفيلم جاهز للتشغيل 🎬');
-            });
+        function loadVideo(path) {
+            if (path === currentMoviePath) return; // Don't reload if same
 
-            hls.on(Hls.Events.ERROR, (event, data) => {
-                if (data.fatal) {
-                    console.error('HLS error:', data);
-                    addSystemMessage('خطأ في تحميل الفيلم - تأكد من وجود الفيلم في مجلد media/');
+            currentMoviePath = path;
+            const fullPath = `/live/${path}`;
+            console.log('Loading video:', fullPath);
+
+            if (Hls.isSupported()) {
+                if (hls) hls.destroy(); // Destroy previous instance
+
+                hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                });
+                hls.loadSource(fullPath);
+                hls.attachMedia(video);
+
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('HLS manifest loaded');
+                    addSystemMessage('الفيلم جاهز للتشغيل 🎬');
+                });
+
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        console.error('HLS error:', data);
+                        addSystemMessage('خطأ في تحميل الفيلم attempt to recover...');
+                        hls.startLoad();
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = fullPath;
+            }
+        }
+
+        // Fetch Catalog
+        async function loadCatalog() {
+            try {
+                const response = await fetch('/live/catalog.json');
+                if (!response.ok) throw new Error('Failed to load catalog');
+                const catalog = await response.json();
+
+                movieSelect.innerHTML = '';
+                if (catalog.length === 0) {
+                    const option = document.createElement('option');
+                    option.text = "لا يوجد أفلام متاحة";
+                    movieSelect.add(option);
+                    return;
                 }
-            });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = '/live/movie.m3u8';
-        } else {
-            addSystemMessage('المتصفح لا يدعم HLS - جرب Chrome أو Safari');
+
+                catalog.forEach(movie => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify(movie); // Store full object
+                    option.text = movie.name;
+                    movieSelect.add(option);
+                });
+
+                // Apply pending movie if exists (from server state)
+                if (pendingMovieId) {
+                    updateSelector(pendingMovieId);
+                    // Also load the video if not loaded yet
+                    const pendingMovie = catalog.find(m => m.id === pendingMovieId);
+                    if (pendingMovie) {
+                        loadVideo(pendingMovie.path);
+                    }
+                    pendingMovieId = null;
+                }
+                // Default to first movie if no state from server yet and nothing selected
+                else if (!currentMoviePath && catalog.length > 0) {
+                    const firstMovie = catalog[0];
+                    loadVideo(firstMovie.path);
+                    // We select it in dropdown but DON'T send change-movie to server
+                    // This creates a local defaults without overwriting other users
+                    updateSelector(firstMovie.id);
+                }
+
+            } catch (err) {
+                console.error('Error loading catalog:', err);
+                movieSelect.innerHTML = '<option>فشل تحميل القائمة</option>';
+            }
+        }
+
+        loadCatalog();
+
+        function changeMovie() {
+            if (!isConnected) return;
+            try {
+                const selectedMovie = JSON.parse(movieSelect.value);
+                ws.send(JSON.stringify({
+                    type: 'change-movie',
+                    movie: selectedMovie
+                }));
+            } catch (e) { console.error(e); }
         }
 
         // WebSocket connection
@@ -122,11 +227,23 @@
         }
 
         function handleWebSocketMessage(data) {
-            switch(data.type) {
+            switch (data.type) {
                 case 'state':
+                    if (data.currentMovie) {
+                        loadVideo(data.currentMovie.path);
+                        updateSelector(data.currentMovie.id);
+                    } else {
+                        // If null state, we depend on loadCatalog logic to pick default
+                    }
                     syncVideoState(data);
                     break;
-                
+
+                case 'movie-changed':
+                    addSystemMessage(`🎬 ${data.username} غير الفيلم إلى: ${data.movie.name}`);
+                    loadVideo(data.movie.path);
+                    updateSelector(data.movie.id);
+                    break;
+
                 case 'sync':
                     if (data.username !== username) {
                         showSyncIndicator(`${data.username} قام بـ ${data.action === 'play' ? 'تشغيل' : 'إيقاف'} الفيديو`);
@@ -159,9 +276,31 @@
             }
         }
 
+        function updateSelector(movieId) {
+            let found = false;
+            // Find option with this movie ID and select it
+            for (let i = 0; i < movieSelect.options.length; i++) {
+                try {
+                    // Check if value is valid JSON
+                    if (!movieSelect.options[i].value) continue;
+
+                    const movie = JSON.parse(movieSelect.options[i].value);
+                    if (movie.id === movieId) {
+                        movieSelect.selectedIndex = i;
+                        found = true;
+                        break;
+                    }
+                } catch (e) { }
+            }
+
+            if (!found) {
+                pendingMovieId = movieId;
+            }
+        }
+
         function syncVideoState(data) {
             isSyncing = true;
-            
+
             const timeDiff = Math.abs(video.currentTime - data.time);
             if (timeDiff > 2) {
                 video.currentTime = data.time;
@@ -218,7 +357,7 @@
         function sendMessage() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
-            
+
             if (message && isConnected) {
                 ws.send(JSON.stringify({
                     type: 'chat',
@@ -282,4 +421,5 @@
         connectWebSocket();
     </script>
 </body>
+
 </html>
