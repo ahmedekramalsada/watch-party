@@ -1,6 +1,19 @@
-const WebSocket = require('ws');
-const port = process.env.PORT || 3000;
-const wss = new WebSocket.Server({ port });
+const http = require('http');
+const server = http.createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200);
+    res.end('OK');
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+
+const wss = new WebSocket.Server({ server });
+
+server.listen(port, () => {
+  console.log(`Server is listening on port ${port}`);
+});
 
 // Store rooms and their states
 const rooms = new Map();
@@ -8,10 +21,10 @@ const rooms = new Map();
 function getRoom(roomId) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
-      state: { 
-        action: 'pause', 
-        time: 0, 
-        timestamp: Date.now() 
+      state: {
+        action: 'pause',
+        time: 0,
+        timestamp: Date.now()
       },
       clients: new Set(),
       users: new Map() // username -> client
@@ -23,7 +36,7 @@ function getRoom(roomId) {
 function broadcastToRoom(roomId, message, excludeClient = null) {
   const room = getRoom(roomId);
   const data = JSON.stringify(message);
-  
+
   room.clients.forEach(client => {
     if (client !== excludeClient && client.readyState === WebSocket.OPEN) {
       client.send(data);
@@ -45,11 +58,11 @@ wss.on('connection', (ws) => {
         case 'join':
           currentRoom = message.roomId;
           username = message.username || `User${Math.floor(Math.random() * 1000)}`;
-          
+
           const room = getRoom(currentRoom);
           room.clients.add(ws);
           room.users.set(username, ws);
-          
+
           // Send current state to new user
           ws.send(JSON.stringify({
             type: 'state',
@@ -142,4 +155,4 @@ wss.on('connection', (ws) => {
   });
 });
 
-console.log('WebSocket server running on port 3000');
+
