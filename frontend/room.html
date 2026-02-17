@@ -171,8 +171,12 @@
 
             if (movie.type === 'catalog') {
                 videoUrl = `/live/${movie.path}`;
-                movieSelect.value = JSON.stringify(movie); // Sync UI
                 directLinkInput.value = ''; // Clear URL input
+                // Try to sync UI immediately
+                if (!selectCatalogMovieById(movie.id)) {
+                    console.log('Catalog item not found in UI yet, pending:', movie.id);
+                    pendingMovieId = movie.id;
+                }
             } else if (movie.type === 'url') {
                 videoUrl = movie.url;
                 movieSelect.selectedIndex = -1; // Deselect catalog
@@ -240,12 +244,17 @@
                     });
                 }
 
-                // If pending ID exists from server state
+                // If pending ID exists from server state 
                 if (pendingMovieId) {
                     selectCatalogMovieById(pendingMovieId);
                     pendingMovieId = null;
                 }
-                // If no server state yet, default to first item locally (optional, maybe wait for user)
+                // If no server state yet (e.g. fresh room), load defaults
+                else if (!currentMovieSource && catalog.length > 0) {
+                    const firstMovie = { ...catalog[0], type: 'catalog' };
+                    // Play it locally (don't broadcast yet)
+                    loadVideoSource(firstMovie);
+                }
 
             } catch (err) {
                 console.error(err);
@@ -261,11 +270,11 @@
                     const movie = JSON.parse(val);
                     if (movie.id === id) {
                         movieSelect.selectedIndex = i;
-                        // Don't trigger change event, just UI update
-                        break;
+                        return true; // Found and selected
                     }
                 } catch (e) { }
             }
+            return false; // Not found
         }
 
         loadCatalog();
