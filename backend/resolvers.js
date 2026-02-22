@@ -34,56 +34,58 @@ function unpack(packed) {
 }
 
 /**
- * Specialized resolver for vidspeed.org and similar sites using JWPlayer + Packer.
+ * Generic extractor for JWPlayer, Clappr, and other common patterns.
  */
-async function resolveVidspeed(url) {
-    try {
-        const response = await fetch(url);
-        const html = await response.text();
+function extractFromHtml(html) {
+    // 1. Try Packer unpacking
+    const evalMatch = html.match(/eval\(function\(p,a,c,k,e,d\).+?\.split\('\|'\)\)\)/gs);
+    if (evalMatch) {
+        for (const packed of evalMatch) {
+            const unpacked = unpack(packed);
+            if (unpacked) {
+                // Look for common "file" or "sources" patterns in unpacked JS
+                const fileMatch = unpacked.match(/file\s*:\s*["']([^"']+\.(m3u8|mp4|mkv)[^"']*)["']/);
+                if (fileMatch) return fileMatch[1];
 
-        // Find the eval script block - use /s for multi-line support
-        const fullEvalMatch = html.match(/eval\(function\(p,a,c,k,e,d\).+?\.split\('\|'\)\)\)/s);
-        if (!fullEvalMatch) return null;
-
-        const unpacked = unpack(fullEvalMatch[0]);
-        if (!unpacked) return null;
-
-        // Check if it's jwplayer
-        if (!unpacked.includes('jwplayer')) return null;
-
-        // Find the file URL in the unpacked JS
-        const fileMatch = unpacked.match(/file\s*:\s*["']([^"']+\.m3u8[^"']*)["']/);
-        if (fileMatch) {
-            return {
-                url: fileMatch[1],
-                name: 'Vidspeed Auto-Detected ✨'
-            };
+                const sourcesMatch = unpacked.match(/sources\s*:\s*\[\s*["']([^"']+)["']/);
+                if (sourcesMatch) return sourcesMatch[1];
+            }
         }
-
-        return null;
-    } catch (err) {
-        console.error('Vidspeed Resolver Error:', err);
-        return null;
     }
+
+    // 2. Try direct "sources" array regex (Clappr/JW8)
+    const sourcesMatch = html.match(/sources:\s*\["([^"]+)"\]/);
+    if (sourcesMatch) return sourcesMatch[1];
+
+    // 3. Try standard "file" field
+    const fileMatch = html.match(/file\s*:\s*["']([^"']+\.(m3u8|mp4|mkv)[^"']*)["']/);
+    if (fileMatch) return fileMatch[1];
+
+    // 4. Try <source> tags
+    const tagMatch = html.match(/<source\s+[^>]*src=["']([^"']+)["']/i);
+    if (tagMatch) return tagMatch[1];
+
+    return null;
 }
 
-async function resolveUqload(url) {
+/**
+ * Specialized resolver for various sites.
+ */
+async function resolveGeneric(url) {
     try {
         const response = await fetch(url);
         const html = await response.text();
+        const videoUrl = extractFromHtml(html);
 
-        // Regex for Clappr sources: ["..."]
-        const sourcesMatch = html.match(/sources:\s*\["([^"]+)"\]/);
-        if (sourcesMatch) {
+        if (videoUrl) {
             return {
-                url: sourcesMatch[1],
-                name: 'Uqload Auto-Detected ✨'
+                url: videoUrl,
+                name: 'Auto-Detected ✨'
             };
         }
-
         return null;
     } catch (err) {
-        console.error('Uqload Resolver Error:', err);
+        console.error('Generic Resolver Error:', err);
         return null;
     }
 }
@@ -92,20 +94,12 @@ async function resolveUqload(url) {
  * Universal Resolver Entry Point
  */
 async function resolveUrl(url) {
-    // 1. Try specialized resolvers first
-    if (url.includes('vidspeed.org')) {
-        console.log('Using specialized vidspeed resolver...');
-        const result = await resolveVidspeed(url);
-        if (result) return result;
-    }
+    // 1. Try our powerful generic resolver first (handles Vidspeed, Uqload, and many others)
+    console.log(`Checking generic resolver for: ${url}`);
+    const result = await resolveGeneric(url);
+    if (result) return result;
 
-    if (url.includes('uqload.is')) {
-        console.log('Using specialized uqload resolver...');
-        const result = await resolveUqload(url);
-        if (result) return result;
-    }
-
-    // 2. Fallback to yt-dlp if specialized resolvers fail
+    // 2. Fallback to yt-dlp for major sites (YouTube, TikTok, Twitch, etc.)
     return new Promise((resolve) => {
         console.log('Falling back to yt-dlp...');
         exec(`yt-dlp --get-url -f "best" --no-playlist "${url}"`, (error, stdout, stderr) => {
