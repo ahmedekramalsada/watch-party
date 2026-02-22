@@ -88,3 +88,13 @@ This project is "Zeabur-Ready".
 
 MIT License. Free to use and modify! 
 Happy Watching! 🎥
+
+---
+
+## ❓ Troubleshooting Video Links
+
+If a link works for you but not for your friends:
+1. **CORS Policy**: Many websites block video playback on external domains. Use links from CDNs that allow cross-origin requests.
+2. **Mixed Content**: If you deploy on HTTPS, all video links **MUST** also be HTTPS. Browsers block naked `http://` links on secure sites.
+3. **Format Support**: Ensure the link is either a direct MP4 or an HLS (`.m3u8`) stream.
+4. **Ad-Blockers**: Some ad-blockers can interfere with WebSocket connections or video scripts.

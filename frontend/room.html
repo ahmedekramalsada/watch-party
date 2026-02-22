@@ -188,7 +188,7 @@
             </div>
 
             <div class="video-wrapper">
-                <video id="video" controls playsinline></video>
+                <video id="video" controls playsinline crossorigin="anonymous"></video>
                 <div class="sync-indicator" id="syncIndicator">
                     🔄 جاري المزامنة...
                 </div>
@@ -295,18 +295,37 @@
                 customUrlInput.value = movie.url;
             }
 
-            if (Hls.isSupported() && url.includes('.m3u8')) {
+            const isHLS = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('master.m3u8') || url.toLowerCase().includes('playlist.m3u8');
+
+            if (Hls.isSupported() && isHLS) {
                 if (hls) hls.destroy();
-                hls = new Hls();
+                hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                });
                 hls.loadSource(url);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     console.log('Manifest loaded');
                 });
-                hls.on(Hls.Events.ERROR, (e, data) => {
+                hls.on(Hls.Events.ERROR, (event, data) => {
                     if (data.fatal) {
-                        console.error('HLS Error', data);
-                        hls.startLoad();
+                        console.error('HLS Fatal Error:', data.type);
+                        switch (data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                showSyncIndicator('❌ خطأ في الشبكة (الرابط غير متاح)');
+                                reportPlaybackError('Network/CORS Error');
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                showSyncIndicator('❌ خطأ في تشغيل المقطع');
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                showSyncIndicator('❌ فشل تشغيل الرابط');
+                                reportPlaybackError('Unknown Fatal Error');
+                                hls.destroy();
+                                break;
+                        }
                     }
                 });
             } else {
@@ -314,6 +333,23 @@
                 video.src = url;
             }
         }
+
+        function reportPlaybackError(errorType) {
+            if (isConnected) {
+                ws.send(JSON.stringify({
+                    type: 'chat',
+                    message: `⚠️ تنبيه: فشل تحميل الفيديو عندي (${errorType}). قد يواجه الرابط مشكلة CORS أو أنه غير صالح.`
+                }));
+            }
+        }
+
+        video.onerror = () => {
+            if (video.src) {
+                console.error("Native Video Error:", video.error);
+                showSyncIndicator('❌ فشل تحميل الفيديو (Native Error)');
+                reportPlaybackError('Native Format/CORS Error');
+            }
+        };
 
         function syncDropdown(id) {
             for (let i = 0; i < movieSelect.options.length; i++) {
