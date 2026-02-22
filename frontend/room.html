@@ -298,10 +298,16 @@
             const isHLS = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('master.m3u8') || url.toLowerCase().includes('playlist.m3u8');
 
             if (Hls.isSupported() && isHLS) {
+                video.removeAttribute('crossorigin'); // HLS.js handles its own fetch
                 if (hls) hls.destroy();
                 hls = new Hls({
                     enableWorker: true,
                     lowLatencyMode: true,
+                    // Allow HLS.js to fetch segments even if they don't have CORS, 
+                    // though this only works if the manifest is on the same origin or has CORS.
+                    xhrSetup: function (xhr, url) {
+                        xhr.withCredentials = false;
+                    }
                 });
                 hls.loadSource(url);
                 hls.attachMedia(video);
@@ -313,7 +319,7 @@
                         console.error('HLS Fatal Error:', data.type);
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
-                                showSyncIndicator('❌ خطأ في الشبكة (الرابط غير متاح)');
+                                showSyncIndicator('❌ خطأ في الشبكة (قد يكون الرابط منتهي أو محمي)');
                                 reportPlaybackError('Network/CORS Error');
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
@@ -330,6 +336,8 @@
                 });
             } else {
                 if (hls) { hls.destroy(); hls = null; }
+                // For direct MP4s, try WITHOUT crossorigin first for maximum compatibility
+                video.removeAttribute('crossorigin');
                 video.src = url;
             }
         }
@@ -338,16 +346,27 @@
             if (isConnected) {
                 ws.send(JSON.stringify({
                     type: 'chat',
-                    message: `⚠️ تنبيه: فشل تحميل الفيديو عندي (${errorType}). قد يواجه الرابط مشكلة CORS أو أنه غير صالح.`
+                    message: `⚠️ تنبيه: فشل تحميل الفيديو عندي (${errorType}).`
                 }));
             }
         }
 
+        let retryCount = 0;
         video.onerror = () => {
-            if (video.src) {
+            if (video.src && video.src !== window.location.href) {
                 console.error("Native Video Error:", video.error);
-                showSyncIndicator('❌ فشل تحميل الفيديو (Native Error)');
-                reportPlaybackError('Native Format/CORS Error');
+
+                // If it failed with CORS, try one last time without it
+                if (video.getAttribute('crossorigin') && retryCount < 1) {
+                    console.log("Retrying without CORS...");
+                    retryCount++;
+                    video.removeAttribute('crossorigin');
+                    video.load();
+                    return;
+                }
+
+                showSyncIndicator('❌ فشل تحميل الفيديو (قد يكون الرابط محمي)');
+                reportPlaybackError('Format/Access Error');
             }
         };
 
