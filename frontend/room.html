@@ -275,9 +275,8 @@
             currentMovie = movie;
             const url = movie.url;
             console.log('Loading:', url);
-            retryCount = 0; // Reset retry count for new video
+            retryCount = 0;
 
-            // ... (rest of metadata updates)
             document.getElementById('currentTitle').textContent = movie.name;
             document.getElementById('currentUrl').textContent = url;
             if (movie.poster) {
@@ -292,14 +291,14 @@
                 syncDropdown(movie.id);
                 customUrlInput.value = '';
             } else {
-                movieSelect.selectedIndex = -1; // Deselect
+                movieSelect.selectedIndex = -1;
                 customUrlInput.value = movie.url;
             }
 
             const isHLS = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('master.m3u8') || url.toLowerCase().includes('playlist.m3u8');
 
             if (Hls.isSupported() && isHLS) {
-                video.removeAttribute('crossorigin'); // HLS.js handles its own fetch
+                video.removeAttribute('crossorigin');
                 if (hls) hls.destroy();
                 hls = new Hls({
                     enableWorker: true,
@@ -319,7 +318,7 @@
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
                                 showSyncIndicator('❌ خطأ في الشبكة (قد يكون الرابط منتهي أو محمي)');
-                                reportPlaybackError('Network/CORS Error');
+                                reportPlaybackError(`HLS Network Error (${data.details})`);
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
                                 showSyncIndicator('❌ خطأ في تشغيل المقطع');
@@ -327,7 +326,7 @@
                                 break;
                             default:
                                 showSyncIndicator('❌ فشل تشغيل الرابط');
-                                reportPlaybackError('Unknown Fatal Error');
+                                reportPlaybackError(`HLS Error (${data.type})`);
                                 hls.destroy();
                                 break;
                         }
@@ -335,8 +334,6 @@
                 });
             } else {
                 if (hls) { hls.destroy(); hls = null; }
-                // For direct MP4s, start WITHOUT crossorigin and try it ONLY if it fails (optional)
-                // Actually start WITHOUT and only add if needed (reverse of previous)
                 video.removeAttribute('crossorigin');
                 video.src = url;
             }
@@ -354,19 +351,27 @@
         let retryCount = 0;
         video.onerror = () => {
             if (video.src && video.src !== window.location.href) {
-                console.error("Native Video Error:", video.error);
+                let errDetail = "Unknown Error";
+                if (video.error) {
+                    switch (video.error.code) {
+                        case 1: errDetail = "Aborted"; break;
+                        case 2: errDetail = "Network Error"; break;
+                        case 3: errDetail = "Decode Error"; break;
+                        case 4: errDetail = "Source Not Supported / Access Denied"; break;
+                    }
+                }
+                console.error("Native Video Error:", errDetail, video.error);
 
-                // If it failed with CORS, try one last time without it
-                if (video.getAttribute('crossorigin') && retryCount < 1) {
-                    console.log("Retrying without CORS...");
+                if (!video.getAttribute('crossorigin') && retryCount < 1) {
+                    console.log("Retrying with CORS anonymous...");
                     retryCount++;
-                    video.removeAttribute('crossorigin');
+                    video.setAttribute('crossorigin', 'anonymous');
                     video.load();
                     return;
                 }
 
-                showSyncIndicator('❌ فشل تحميل الفيديو (قد يكون الرابط محمي)');
-                reportPlaybackError('Format/Access Error');
+                showSyncIndicator('❌ فشل تحميل الفيديو (قد يكون الرابط محمي أو منتهي)');
+                reportPlaybackError(errDetail);
             }
         };
 
