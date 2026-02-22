@@ -1,5 +1,6 @@
 const http = require('http');
 const WebSocket = require('ws');
+const { exec } = require('child_process');
 const port = process.env.PORT || 3000;
 
 const server = http.createServer((req, res) => {
@@ -82,7 +83,6 @@ wss.on('connection', (ws) => {
         case 'change-movie':
           if (currentRoom) {
             const room = getRoom(currentRoom);
-            // message.movie can be { type: 'catalog', ... } or { type: 'url', url: '...' }
             room.state.currentMovie = message.movie;
             room.state.time = 0;
             room.state.action = 'pause';
@@ -126,17 +126,15 @@ wss.on('connection', (ws) => {
           }
           break;
 
-
         case 'buffering':
           if (currentRoom) {
             const room = getRoom(currentRoom);
-            // Broadcast buffering status to everyone (including sender)
             room.clients.forEach(client => {
               if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify({
                   type: 'buffering',
                   username: username,
-                  action: message.action // 'start' or 'end'
+                  action: message.action
                 }));
               }
             });
@@ -149,7 +147,6 @@ wss.on('connection', (ws) => {
             room.state.time = message.time;
             room.state.action = message.action;
 
-            // Broadcast to EVERYONE (including sender to confirm)
             room.clients.forEach(client => {
               if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify({
@@ -163,12 +160,47 @@ wss.on('connection', (ws) => {
           }
           break;
 
+        case 'resolve-url':
+          if (currentRoom) {
+            const pageUrl = message.url;
+            console.log(`Resolving URL: ${pageUrl}`);
+            exec(`yt-dlp --get-url -f "best" --no-playlist "${pageUrl}"`, (error, stdout, stderr) => {
+              if (error) {
+                console.error(`yt-dlp error: ${error.message}`);
+                ws.send(JSON.stringify({
+                  type: 'error',
+                  message: 'فشل استخراج الرابط. حاول يدويًا.'
+                }));
+                return;
+              }
+              const resolvedUrl = stdout.trim();
+              if (resolvedUrl) {
+                console.log(`Resolved to: ${resolvedUrl}`);
+                const movie = {
+                  type: 'url',
+                  url: resolvedUrl,
+                  name: 'تم الاستخراج تلقائيًا ✨',
+                  id: 'resolved-' + Date.now()
+                };
+                const room = getRoom(currentRoom);
+                room.state.currentMovie = movie;
+                room.state.time = 0;
+                room.state.action = 'pause';
+                broadcastToRoom(currentRoom, {
+                  type: 'movie-changed',
+                  movie: movie,
+                  username: 'System (AI)'
+                });
+              }
+            });
+          }
+          break;
+
         case 'seek':
           if (currentRoom) {
             const room = getRoom(currentRoom);
             room.state.time = message.time;
             room.state.timestamp = Date.now();
-
             broadcastToRoom(currentRoom, {
               type: 'seek',
               time: message.time,
@@ -187,19 +219,15 @@ wss.on('connection', (ws) => {
       const room = getRoom(currentRoom);
       room.clients.delete(ws);
       room.users.delete(username);
-
       broadcastToRoom(currentRoom, {
         type: 'user-left',
         username,
         userCount: room.clients.size
       });
-
-      // Clean up empty rooms
       if (room.clients.size === 0) {
         rooms.delete(currentRoom);
         console.log(`Room ${currentRoom} deleted (empty)`);
       }
-
       console.log(`${username} left room ${currentRoom}`);
     }
   });

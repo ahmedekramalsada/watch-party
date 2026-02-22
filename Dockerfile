@@ -2,8 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install Nginx
-RUN apk add --no-cache nginx
+# Install Dependencies (Nginx, Python3, yt-dlp)
+RUN apk add --no-cache nginx python3 py3-pip \
+    && pip install --no-cache-dir yt-dlp --break-system-packages
 
 # Setup Backend
 COPY backend/package*.json ./backend/

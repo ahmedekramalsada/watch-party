@@ -516,7 +516,8 @@
                 (url.includes('.html') || url.includes('.php') || !url.includes('.'));
 
             if (isWebpage) {
-                document.getElementById('linkHelperModal').style.display = 'flex';
+                showSyncIndicator('✨ جاري استخراج الفيديو تلقائيًا...');
+                ws.send(JSON.stringify({ type: 'resolve-url', url: url }));
                 return;
             }
 
@@ -566,6 +567,10 @@
                 case 'movie-changed':
                     addSystemMessage(`🎬 ${data.username} شغل: ${data.movie.name}`);
                     loadVideo(data.movie);
+                    break;
+                case 'error':
+                    showSyncIndicator(`❌ ${data.message}`);
+                    document.getElementById('linkHelperModal').style.display = 'flex';
                     break;
                 case 'sync':
                     if (!isBuffering) syncVideo(data);
