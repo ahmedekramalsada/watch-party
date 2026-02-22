@@ -1,6 +1,7 @@
 const http = require('http');
 const WebSocket = require('ws');
 const { exec } = require('child_process');
+const { resolveUrl } = require('./resolvers');
 const port = process.env.PORT || 3000;
 
 const server = http.createServer((req, res) => {
@@ -164,34 +165,36 @@ wss.on('connection', (ws) => {
           if (currentRoom) {
             const pageUrl = message.url;
             console.log(`Resolving URL: ${pageUrl}`);
-            exec(`yt-dlp --get-url -f "best" --no-playlist "${pageUrl}"`, (error, stdout, stderr) => {
-              if (error) {
-                console.error(`yt-dlp error: ${error.message}`);
+
+            resolveUrl(pageUrl).then(result => {
+              if (!result || !result.url) {
                 ws.send(JSON.stringify({
                   type: 'error',
-                  message: 'فشل استخراج الرابط. حاول يدويًا.'
+                  message: 'فشل استخراج الرابط تلقائيًا. حاول يدويًا.'
                 }));
                 return;
               }
-              const resolvedUrl = stdout.trim();
-              if (resolvedUrl) {
-                console.log(`Resolved to: ${resolvedUrl}`);
-                const movie = {
-                  type: 'url',
-                  url: resolvedUrl,
-                  name: 'تم الاستخراج تلقائيًا ✨',
-                  id: 'resolved-' + Date.now()
-                };
-                const room = getRoom(currentRoom);
-                room.state.currentMovie = movie;
-                room.state.time = 0;
-                room.state.action = 'pause';
-                broadcastToRoom(currentRoom, {
-                  type: 'movie-changed',
-                  movie: movie,
-                  username: 'System (AI)'
-                });
-              }
+
+              const movie = {
+                type: 'url',
+                url: result.url,
+                name: result.name || 'تم الاستخراج ✨',
+                id: 'resolved-' + Date.now()
+              };
+
+              const room = getRoom(currentRoom);
+              room.state.currentMovie = movie;
+              room.state.time = 0;
+              room.state.action = 'pause';
+
+              broadcastToRoom(currentRoom, {
+                type: 'movie-changed',
+                movie: movie,
+                username: 'System (AI)'
+              });
+            }).catch(err => {
+              console.error('Resolve-URL handler error:', err);
+              ws.send(JSON.stringify({ type: 'error', message: 'خطأ داخلي في الخادم.' }));
             });
           }
           break;
