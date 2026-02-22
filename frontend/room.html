@@ -131,6 +131,61 @@
             border-radius: 4px;
             display: none;
         }
+
+        /* Link Helper Modal */
+        #linkHelperModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 100%;
+            border: 1px solid #444;
+            color: white;
+            position: relative;
+        }
+
+        .modal-content h2 {
+            color: #f39c12;
+            margin-top: 0;
+        }
+
+        .modal-content ol {
+            padding-right: 20px;
+            line-height: 1.6;
+        }
+
+        .modal-content kbd {
+            background: #333;
+            border: 1px solid #555;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .btn-close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -207,11 +262,29 @@
                 <h3>💬 الشات</h3>
             </div>
             <div class="chat-messages" id="chatMessages"></div>
-            <div class="chat-input">
-                <input type="text" id="messageInput" placeholder="اكتب رسالة..."
-                    onkeypress="handleMessageKeypress(event)">
-                <button class="btn btn-primary" onclick="sendMessage()">إرسال</button>
-            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- LINK HELPER MODAL -->
+    <div id="linkHelperModal">
+        <div class="modal-content">
+            <button class="btn-close-modal" onclick="closeLinkHelper()">×</button>
+            <h2>🔗 الرابط غير صالح للمشاهدة</h2>
+            <p>يبدو أنك قمت بنسخ رابط <strong>صفحة ويب</strong> بدلاً من رابط <strong>الفيديو المباشر</strong>. المشغل
+                يحتاج إلى رابط ينتهي بـ (.mp4) أو (.m3u8).</p>
+
+            <h3>كيف تحصل على الرابط الصحيح من الموقع؟</h3>
+            <ol>
+                <li>افتح صفحة الفيديو في متصفحك.</li>
+                <li>اضغط بيمين الماوس واختر <strong>Inspect (فحص)</strong> أو اضغط <kbd>F12</kbd>.</li>
+                <li>اذهب إلى تبويب <strong>Network (الشبكة)</strong>.</li>
+                <li>ابحث في خانة البحث عن <code>m3u8</code> أو <code>mp4</code>.</li>
+                <li>قم بتشغيل الفيديو، سيظهر لك رابط جديد.</li>
+                <li>اضغط بيمين الماوس عليه واختر <strong>Copy link address</strong>.</li>
+            </ol>
+            <button class="btn btn-primary" style="width: 100%;" onclick="closeLinkHelper()">فهمت، سأبحث عن
+                الرابط</button>
         </div>
     </div>
 
@@ -438,6 +511,15 @@
             const url = customUrlInput.value.trim();
             if (!url) return alert("الرجاء إدخال رابط");
 
+            // Webpage detection
+            const isWebpage = !url.toLowerCase().split('?')[0].match(/\.(mp4|m3u8|mkv|mov|avi)$/) &&
+                (url.includes('.html') || url.includes('.php') || !url.includes('.'));
+
+            if (isWebpage) {
+                document.getElementById('linkHelperModal').style.display = 'flex';
+                return;
+            }
+
             const movie = {
                 type: 'url',
                 url: url,
@@ -445,6 +527,10 @@
                 id: 'custom-' + Date.now()
             };
             ws.send(JSON.stringify({ type: 'change-movie', movie }));
+        }
+
+        function closeLinkHelper() {
+            document.getElementById('linkHelperModal').style.display = 'none';
         }
 
         // --- WEBSOCKET ---

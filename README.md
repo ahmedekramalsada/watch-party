@@ -96,5 +96,15 @@ Happy Watching! 🎥
 If a link works for you but not for your friends:
 1. **CORS Policy**: Many websites block video playback on external domains. Use links from CDNs that allow cross-origin requests.
 2. **Mixed Content**: If you deploy on HTTPS, all video links **MUST** also be HTTPS. Browsers block naked `http://` links on secure sites.
-3. **Format Support**: Ensure the link is either a direct MP4 or an HLS (`.m3u8`) stream.
+3. **Format Support**: Ensure the link is either a direct MP4 or an HLS (`.m3u8`) stream. **Webpage links (ending in .html or .php) will NOT work.**
+
+### 🔍 How to find the "Direct Link"?
+If you have a webpage link with a video player:
+1. **Open the page** in Chrome/Edge/Firefox.
+2. **Press F12** (or Right-click -> Inspect).
+3. Go to the **Network** tab.
+4. Refresh the page and type `m3u8` in the filter box.
+5. **Right-click** the first file that appears and select **Copy -> Copy link address**.
+6. Paste that link into the Watch Party room!
+
 4. **Ad-Blockers**: Some ad-blockers can interfere with WebSocket connections or video scripts.
