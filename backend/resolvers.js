@@ -67,6 +67,27 @@ async function resolveVidspeed(url) {
     }
 }
 
+async function resolveUqload(url) {
+    try {
+        const response = await fetch(url);
+        const html = await response.text();
+
+        // Regex for Clappr sources: ["..."]
+        const sourcesMatch = html.match(/sources:\s*\["([^"]+)"\]/);
+        if (sourcesMatch) {
+            return {
+                url: sourcesMatch[1],
+                name: 'Uqload Auto-Detected ✨'
+            };
+        }
+
+        return null;
+    } catch (err) {
+        console.error('Uqload Resolver Error:', err);
+        return null;
+    }
+}
+
 /**
  * Universal Resolver Entry Point
  */
@@ -75,6 +96,12 @@ async function resolveUrl(url) {
     if (url.includes('vidspeed.org')) {
         console.log('Using specialized vidspeed resolver...');
         const result = await resolveVidspeed(url);
+        if (result) return result;
+    }
+
+    if (url.includes('uqload.is')) {
+        console.log('Using specialized uqload resolver...');
+        const result = await resolveUqload(url);
         if (result) return result;
     }
 
