@@ -7,9 +7,8 @@ RUN apk add --no-cache nginx python3 py3-pip \
     && pip install --no-cache-dir yt-dlp --break-system-packages
 
 # Setup Backend
-COPY backend/package*.json ./backend/
-RUN cd backend && npm install --production
-COPY backend/server.js ./backend/
+COPY backend /app/backend
+RUN cd /app/backend && npm install --production
 
 # Setup Frontend (Vanilla JS - No build needed)
 COPY frontend /usr/share/nginx/html

@@ -321,6 +321,7 @@
         let hls;
         let currentMovie = null;
         let pendingMovieId = null;
+        let retryCount = 0;
 
         // --- LOBBY LOGIC ---
         function joinRoom() {
@@ -421,7 +422,6 @@
             }
         }
 
-        let retryCount = 0;
         video.onerror = () => {
             if (video.src && video.src !== window.location.href) {
                 let errDetail = "Unknown Error";
