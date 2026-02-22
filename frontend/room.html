@@ -188,7 +188,7 @@
             </div>
 
             <div class="video-wrapper">
-                <video id="video" controls playsinline crossorigin="anonymous"></video>
+                <video id="video" controls playsinline referrerpolicy="no-referrer"></video>
                 <div class="sync-indicator" id="syncIndicator">
                     🔄 جاري المزامنة...
                 </div>
@@ -275,8 +275,9 @@
             currentMovie = movie;
             const url = movie.url;
             console.log('Loading:', url);
+            retryCount = 0; // Reset retry count for new video
 
-            // Update UI
+            // ... (rest of metadata updates)
             document.getElementById('currentTitle').textContent = movie.name;
             document.getElementById('currentUrl').textContent = url;
             if (movie.poster) {
@@ -303,8 +304,6 @@
                 hls = new Hls({
                     enableWorker: true,
                     lowLatencyMode: true,
-                    // Allow HLS.js to fetch segments even if they don't have CORS, 
-                    // though this only works if the manifest is on the same origin or has CORS.
                     xhrSetup: function (xhr, url) {
                         xhr.withCredentials = false;
                     }
@@ -336,7 +335,8 @@
                 });
             } else {
                 if (hls) { hls.destroy(); hls = null; }
-                // For direct MP4s, try WITHOUT crossorigin first for maximum compatibility
+                // For direct MP4s, start WITHOUT crossorigin and try it ONLY if it fails (optional)
+                // Actually start WITHOUT and only add if needed (reverse of previous)
                 video.removeAttribute('crossorigin');
                 video.src = url;
             }
