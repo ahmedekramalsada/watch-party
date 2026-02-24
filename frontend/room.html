@@ -186,6 +186,48 @@
             font-size: 1.5em;
             cursor: pointer;
         }
+
+        /* Library Management Modal */
+        .management-list {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .management-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #222;
+        }
+
+        .management-item:last-child {
+            border-bottom: none;
+        }
+
+        .btn-delete {
+            background: #c0392b;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .btn-delete:hover {
+            background: #e74c3c;
+        }
+
+        .management-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 
@@ -252,6 +294,7 @@
             <div class="video-controls">
                 <button class="btn btn-small" onclick="forceSync()">⚡ مزامنة إجبارية</button>
                 <button class="btn btn-small" onclick="copyRoomLink()">📋 نسخ رابط الغرفة</button>
+                <button class="btn btn-small" onclick="openLibraryManager()">⚙️ إدارة المكتبة</button>
                 <button class="btn btn-small btn-danger" onclick="leaveRoom()">🚪 مغادرة</button>
             </div>
         </div>
@@ -269,6 +312,27 @@
             </div>
         </div>
     </div>
+    </div>
+
+    <!-- LIBRARY MANAGEMENT MODAL -->
+    <div id="libraryManageModal"
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;">
+        <div class="modal-content">
+            <button class="btn-close-modal" onclick="closeLibraryManager()">×</button>
+            <h2>⚙️ إدارة المكتبة</h2>
+
+            <h3>📥 تحميل فيديو جديد</h3>
+            <div class="management-input-group">
+                <input type="text" id="webDownloadUrl" placeholder="أدخل رابط التحميل هنا..." style="flex: 2;">
+                <input type="text" id="webDownloadTitle" placeholder="عنوان الفيلم" style="flex: 1;">
+                <button class="btn btn-primary" onclick="webDownloadVideo()">بدء التحميل</button>
+            </div>
+
+            <h3>🗑️ حذف من المكتبة</h3>
+            <div id="managementList" class="management-list">
+                <!-- Items will be populated here -->
+            </div>
+        </div>
     </div>
 
     <!-- LINK HELPER MODAL -->
@@ -616,6 +680,9 @@
                     updateUserCount(data.userCount);
                     addSystemMessage(`${data.username} غادر 👋`);
                     break;
+                case 'library-updated':
+                    loadCatalog();
+                    break;
             }
         }
 
@@ -720,6 +787,74 @@
             const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
             navigator.clipboard.writeText(cleanUrl);
             alert('تم نسخ الرابط! (بدون اسمك) 📋');
+        }
+
+        function openLibraryManager() {
+            document.getElementById('libraryManageModal').style.display = 'flex';
+            populateManagementList();
+        }
+
+        function closeLibraryManager() {
+            document.getElementById('libraryManageModal').style.display = 'none';
+        }
+
+        async function populateManagementList() {
+            const list = document.getElementById('managementList');
+            list.innerHTML = '<p style="text-align: center;">جاري التحميل...</p>';
+
+            try {
+                const response = await fetch('/live/catalog.json');
+                const catalog = await response.json();
+                list.innerHTML = '';
+
+                catalog.forEach(cat => {
+                    cat.items.forEach(movie => {
+                        const div = document.createElement('div');
+                        div.className = 'management-item';
+                        div.innerHTML = `
+                            <span>${movie.name} <small style="color: #666;">(${cat.category})</small></span>
+                            <button class="btn-delete" onclick="webDeleteMovie('${movie.id}')">حذف</button>
+                        `;
+                        list.appendChild(div);
+                    });
+                });
+
+                if (list.innerHTML === '') {
+                    list.innerHTML = '<p style="text-align: center; color: #888;">المكتبة فارغة</p>';
+                }
+            } catch (e) {
+                list.innerHTML = '<p style="text-align: center; color: #e74c3c;">خطأ في تحميل القائمة</p>';
+            }
+        }
+
+        function webDownloadVideo() {
+            const url = document.getElementById('webDownloadUrl').value.trim();
+            const title = document.getElementById('webDownloadTitle').value.trim();
+
+            if (!url) return alert('الرجاء إدخال رابط');
+
+            ws.send(JSON.stringify({
+                type: 'web-download',
+                url: url,
+                title: title
+            }));
+
+            alert('تم بدء عملية التحميل في الخلفية. ستصلك رسالة في الشات عند الانتهاء.');
+            closeLibraryManager();
+            document.getElementById('webDownloadUrl').value = '';
+            document.getElementById('webDownloadTitle').value = '';
+        }
+
+        function webDeleteMovie(movieId) {
+            if (!confirm('هل أنت متأكد من حذف هذا الفيلم؟ لا يمكن التراجع عن هذه الخطوة.')) return;
+
+            ws.send(JSON.stringify({
+                type: 'web-delete',
+                movieId: movieId
+            }));
+
+            // Temporary UI update
+            setTimeout(populateManagementList, 500);
         }
 
         function leaveRoom() { location.href = 'index.html'; }

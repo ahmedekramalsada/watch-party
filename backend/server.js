@@ -1,6 +1,8 @@
 const http = require('http');
 const WebSocket = require('ws');
 const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const { resolveUrl } = require('./resolvers');
 const port = process.env.PORT || 3000;
 
@@ -209,6 +211,76 @@ wss.on('connection', (ws) => {
               time: message.time,
               username
             }, ws);
+          }
+          break;
+
+        case 'web-download':
+          if (currentRoom) {
+            const { url, title } = message;
+            console.log(`Web Download requested: ${url} (${title})`);
+
+            // Execute the python script
+            const cmd = `python3 add_movie.py "${url}" ${title ? `--title "${title}"` : ''}`;
+            exec(cmd, { cwd: path.join(__dirname, '..') }, (error, stdout, stderr) => {
+              if (error) {
+                console.error(`Download error: ${stderr}`);
+                ws.send(JSON.stringify({ type: 'error', message: 'فشل التحميل: ' + stderr }));
+                return;
+              }
+              console.log(`Download success: ${stdout}`);
+              // Notify everyone that library updated
+              broadcastToRoom(currentRoom, {
+                type: 'chat',
+                username: 'System',
+                message: `✅ تم تحميل وإضافة: ${title || 'فيلم جديد'}`,
+                timestamp: Date.now()
+              });
+              // Force clients to reload catalog would be nice, but they can just refresh or we can send a signal
+              broadcastToRoom(currentRoom, { type: 'library-updated' });
+            });
+          }
+          break;
+
+        case 'web-delete':
+          if (currentRoom) {
+            const { movieId } = message;
+            console.log(`Web Delete requested: ${movieId}`);
+
+            const catalogPath = path.join(__dirname, '../media/catalog.json');
+            if (fs.existsSync(catalogPath)) {
+              let catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+              let fileToDelete = null;
+
+              catalog = catalog.map(cat => {
+                const itemIndex = cat.items.findIndex(i => i.id === movieId);
+                if (itemIndex !== -1) {
+                  const item = cat.items[itemIndex];
+                  if (item.url.startsWith('/live/')) {
+                    fileToDelete = item.url.replace('/live/', '');
+                  }
+                  cat.items.splice(itemIndex, 1);
+                }
+                return cat;
+              }).filter(cat => cat.items.length > 0 || cat.category !== 'Downloaded');
+
+              fs.writeFileSync(catalogPath, JSON.stringify(catalog, null, 2), 'utf8');
+
+              if (fileToDelete) {
+                const fullPath = path.join(__dirname, '../media', fileToDelete);
+                if (fs.existsSync(fullPath)) {
+                  fs.unlinkSync(fullPath);
+                  console.log(`Deleted file: ${fullPath}`);
+                }
+              }
+
+              broadcastToRoom(currentRoom, {
+                type: 'chat',
+                username: 'System',
+                message: `🗑️ تم حذف الفيلم من المكتبة.`,
+                timestamp: Date.now()
+              });
+              broadcastToRoom(currentRoom, { type: 'library-updated' });
+            }
           }
           break;
       }
