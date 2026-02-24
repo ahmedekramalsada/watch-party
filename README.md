@@ -11,7 +11,7 @@ A modern, high-performance **Watch Party** application that lets you watch movie
 -   **⏳ Smart Anti-Lag**: If anyone buffers, the video pauses for everyone automatically to keep the group together.
 -   **💬 Live Chat**: Chat with your friends while watching.
 -   **📚 Link Library**: Easily curate your movie list by editing a simple JSON file.
--   **🔗 Direct Link Support**: Paste any `.m3u8` or `.mp4` link directly in the room to play it.
+-   **🔗 Direct Link & Local Support**: Paste any `.m3u8` or `.mp4` link directly in the room, or play local files placed in the `media/` folder.
 -   **📱 Responsive Design**: Works beautifully on Desktop, Mobile, and Tablets.
 
 ---
@@ -56,6 +56,40 @@ The application uses a **Link-Only Library** system. You don't need to upload he
 ```
 
 3.  Restart the container (or just refresh the page if mounted as a volume).
+
+### 📁 Serving Local MP4 Files
+To watch local MP4 files:
+1.  Place your `.mp4` file in the `media/` directory.
+2.  Add it to `media/catalog.json` with a relative URL:
+    ```json
+    {
+      "id": "my-local-video",
+      "name": "Local Movie",
+      "url": "/live/my-video.mp4",
+      "poster": "/live/poster.jpg"
+    }
+    ```
+3.  The file will be served automatically by Nginx and synchronized for everyone.
+
+---
+
+## 📥 Download & Storage Guide
+
+You can easily add videos to your local storage to ensure they never expire.
+
+### ⚡ Automated Download (Recommended)
+We provide a helper script to download and add movies automatically:
+```bash
+# Download a video and add it to the catalog
+python3 add_movie.py "https://example.com/video.mp4" --title "My Movie"
+```
+*Note: This requires `yt-dlp` installed (`pip install yt-dlp`).*
+
+### 🛠️ Manual Download
+If you prefer to do it yourself:
+1.  **Download** the MP4 file using your browser or `curl -O [URL]`.
+2.  **Move** the file into the `media/` folder of this project.
+3.  **Update** `media/catalog.json` by adding a new entry (see the "How to Add Movies" section above).
 
 ---
 

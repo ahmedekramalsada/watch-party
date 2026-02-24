@@ -262,6 +262,11 @@
                 <h3>💬 الشات</h3>
             </div>
             <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="اكتب رسالة..."
+                    onkeypress="handleMessageKeypress(event)">
+                <button class="btn btn-primary" onclick="sendMessage()">إرسال 📤</button>
+            </div>
         </div>
     </div>
     </div>
@@ -699,7 +704,7 @@
         function addChatMessage(user, msg, own = false) {
             const div = document.createElement('div');
             div.className = `chat-message ${own ? 'own-message' : ''}`;
-            div.innerHTML = `<strong>${user}:</strong> ${msg}`;
+            div.innerHTML = `<span class="message-user">${user}:</span> <span class="message-text">${msg}</span>`;
             chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
