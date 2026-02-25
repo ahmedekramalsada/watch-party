@@ -70,7 +70,8 @@ wss.on('connection', (ws) => {
           // Send current state to new user
           ws.send(JSON.stringify({
             type: 'state',
-            ...room.state
+            ...room.state,
+            userCount: room.clients.size
           }));
 
           // Notify others
@@ -81,6 +82,26 @@ wss.on('connection', (ws) => {
           }, ws);
 
           console.log(`${username} joined room ${currentRoom}`);
+          break;
+
+        case 'leave':
+          if (currentRoom) {
+            const room = getRoom(currentRoom);
+            room.clients.delete(ws);
+            room.users.delete(username);
+
+            if (room.clients.size === 0) {
+              rooms.delete(currentRoom);
+              console.log(`Room ${currentRoom} deleted (empty)`);
+            } else {
+              broadcastToRoom(currentRoom, {
+                type: 'user-left',
+                username,
+                userCount: room.clients.size
+              });
+            }
+            console.log(`${username} left room ${currentRoom}`);
+          }
           break;
 
         case 'change-movie':

@@ -2,14 +2,25 @@ import os
 import json
 import subprocess
 import argparse
+import time
+import sys
 
 def add_to_catalog(title, file_path):
-    catalog_path = 'media/catalog.json'
+    # Use absolute path to be safe
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    catalog_path = os.path.join(script_dir, 'media', 'catalog.json')
+    
+    print(f"📖 Updating catalog at: {catalog_path}")
+    
     if not os.path.exists(catalog_path):
         data = []
     else:
-        with open(catalog_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        try:
+            with open(catalog_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"❌ Error reading catalog: {e}")
+            data = []
 
     # Find "Downloaded" category or create it
     target_category = next((c for c in data if c['category'] == 'Downloaded'), None)
@@ -63,7 +74,7 @@ def download_video(url, title):
             
             print(f"📦 Direct MP4 detected, using curl...")
             curl_cmd = [
-                'curl', '-L', 
+                'curl', '-L', '--retry', '3',
                 '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 '-o', file_path,
                 url
@@ -72,6 +83,8 @@ def download_video(url, title):
             if result.returncode == 0:
                 success = True
                 actual_file = file_path
+            else:
+                print(f"❌ Curl failed with code {result.returncode}: {result.stderr}")
 
         if not success:
             # Fallback to yt-dlp

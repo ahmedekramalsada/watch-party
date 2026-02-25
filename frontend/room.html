@@ -602,13 +602,17 @@
                 return;
             }
 
+            // Sync playback for direct links
             const movie = {
                 type: 'url',
                 url: url,
-                name: 'رابط خارجي 🔗',
+                name: 'رابط مباشر 🌐',
                 id: 'custom-' + Date.now()
             };
             ws.send(JSON.stringify({ type: 'change-movie', movie }));
+
+            // Advice for reliability
+            addSystemMessage('⚠️ ملاحظة: بعض الروابط المباشرة قد لا تعمل لدى الآخرين بسبب قيود الموقع الأصلي. يفضل استخدام التحميل للمخزن للمشاهدة الجماعية الثابتة.');
         }
 
         function closeLinkHelper() {
@@ -618,7 +622,14 @@
         // --- WEBSOCKET ---
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            let wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            // Local Development Redirect
+            if (window.location.port === '8080' || window.location.port === '8081') {
+                wsUrl = `ws://${window.location.hostname}:3000/ws`;
+            }
+
+            ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
                 isConnected = true;
@@ -642,6 +653,9 @@
                 case 'state':
                     if (data.currentMovie) {
                         loadVideo(data.currentMovie);
+                    }
+                    if (data.userCount !== undefined) {
+                        updateUserCount(data.userCount);
                     }
                     syncVideo(data);
                     break;
@@ -762,6 +776,12 @@
                     type: 'sync', action, time: video.currentTime
                 }));
             }
+            video.onerror = () => {
+                if (video.src) {
+                    addSystemMessage('❌ خطأ في تشغيل الفيديو. قد يكون الرابط منتهياً أو محمياً.');
+                    showSyncIndicator('❌ خطأ في التشغيل');
+                }
+            };
         }
 
         function forceSync() {
@@ -800,8 +820,10 @@
             div.innerText = msg;
             chatMessages.appendChild(div);
         }
-        function updateUserCount(n) { document.getElementById('userCount').innerText = n; }
-
+        function updateUserCount(count) {
+            const el = document.getElementById('userCount');
+            if (el) el.textContent = count;
+        }
         function copyRoomLink() {
             const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
             navigator.clipboard.writeText(cleanUrl);
