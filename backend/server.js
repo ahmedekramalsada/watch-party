@@ -244,39 +244,58 @@ wss.on('connection', (ws) => {
         case 'web-delete':
           if (currentRoom) {
             const { movieId } = message;
-            console.log(`Web Delete requested: ${movieId}`);
+            console.log(`[DELETE] Request for movieId: ${movieId}`);
 
             const catalogPath = path.join(__dirname, '../media/catalog.json');
             if (fs.existsSync(catalogPath)) {
               let catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
               let fileToDelete = null;
+              let found = false;
 
               catalog = catalog.map(cat => {
                 const itemIndex = cat.items.findIndex(i => i.id === movieId);
                 if (itemIndex !== -1) {
                   const item = cat.items[itemIndex];
-                  if (item.url.startsWith('/live/')) {
+                  found = true;
+                  console.log(`[DELETE] Found item: ${item.name}`);
+                  if (item.url && item.url.startsWith('/live/')) {
                     fileToDelete = item.url.replace('/live/', '');
                   }
                   cat.items.splice(itemIndex, 1);
                 }
                 return cat;
-              }).filter(cat => cat.items.length > 0 || cat.category !== 'Downloaded');
+              }).filter(cat => cat.items.length > 0 || (cat.category !== 'Downloaded' && cat.category !== 'Movies'));
+
+              if (!found) {
+                console.warn(`[DELETE] movieId ${movieId} not found in catalog.`);
+                ws.send(JSON.stringify({ type: 'error', message: 'لم يتم العثور على الفيلم في المكتبة.' }));
+                return;
+              }
 
               fs.writeFileSync(catalogPath, JSON.stringify(catalog, null, 2), 'utf8');
 
               if (fileToDelete) {
-                const fullPath = path.join(__dirname, '../media', fileToDelete);
-                if (fs.existsSync(fullPath)) {
-                  fs.unlinkSync(fullPath);
-                  console.log(`Deleted file: ${fullPath}`);
+                // Remove potential leading slashes
+                const cleanFileName = fileToDelete.startsWith('/') ? fileToDelete.substring(1) : fileToDelete;
+                const fullPath = path.join(__dirname, '../media', cleanFileName);
+                console.log(`[DELETE] Attempting to unlink: ${fullPath}`);
+
+                try {
+                  if (fs.existsSync(fullPath)) {
+                    fs.unlinkSync(fullPath);
+                    console.log(`[DELETE] Successfully deleted file: ${fullPath}`);
+                  } else {
+                    console.warn(`[DELETE] File not found on disk: ${fullPath}`);
+                  }
+                } catch (err) {
+                  console.error(`[DELETE] Error unlinking file: ${err.message}`);
                 }
               }
 
               broadcastToRoom(currentRoom, {
                 type: 'chat',
                 username: 'System',
-                message: `🗑️ تم حذف الفيلم من المكتبة.`,
+                message: `🗑️ تم الحذف من المكتبة بنجاح.`,
                 timestamp: Date.now()
               });
               broadcastToRoom(currentRoom, { type: 'library-updated' });

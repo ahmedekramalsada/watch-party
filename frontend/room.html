@@ -274,6 +274,17 @@
                     <button class="btn-play" onclick="playCustomLink()">تشغيل</button>
                 </div>
 
+                <div class="divider"></div>
+
+                <!-- Web Download from main UI -->
+                <div class="selector-row">
+                    <label>📥 تحميل للمخزن:</label>
+                    <input type="text" id="mainWebDownloadUrl" placeholder="الصق الرابط للتحميل...">
+                    <button class="btn-play" style="background: #27ae60;" onclick="mainWebDownload()">تحميل 💾</button>
+                    <button class="btn-play" style="background: #3498db;" onclick="openLibraryManager()">⚙️
+                        إدارة</button>
+                </div>
+
                 <!-- Info Display -->
                 <div class="movie-info" id="movieInfo">
                     <img id="posterImg" class="movie-poster" src="" alt="Poster">
@@ -848,13 +859,29 @@
         function webDeleteMovie(movieId) {
             if (!confirm('هل أنت متأكد من حذف هذا الفيلم؟ لا يمكن التراجع عن هذه الخطوة.')) return;
 
+            console.log('Requesting delete for:', movieId);
             ws.send(JSON.stringify({
                 type: 'web-delete',
                 movieId: movieId
             }));
 
-            // Temporary UI update
-            setTimeout(populateManagementList, 500);
+            // UI feedback
+            showSyncIndicator('🗑️ جاري الحذف...');
+            setTimeout(populateManagementList, 1000);
+        }
+
+        function mainWebDownload() {
+            const url = document.getElementById('mainWebDownloadUrl').value.trim();
+            if (!url) return alert('الرجاء إدخال رابط');
+
+            ws.send(JSON.stringify({
+                type: 'web-download',
+                url: url,
+                title: ''
+            }));
+
+            showSyncIndicator('📥 بدأ التحميل في الخلفية...');
+            document.getElementById('mainWebDownloadUrl').value = '';
         }
 
         function leaveRoom() { location.href = 'index.html'; }

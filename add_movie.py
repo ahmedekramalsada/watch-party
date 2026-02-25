@@ -46,30 +46,59 @@ def download_video(url, title):
         output_template = f"media/{title}.%(ext)s"
 
     print(f"🚀 Downloading from: {url}")
-    try:
-        cmd = [
-            'yt-dlp',
-            '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            '--merge-output-format', 'mp4',
-            '-o', output_template,
-            url
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            print(f"❌ Error downloading: {result.stderr}")
-            return
+    
+    # Check if it's a direct MP4 link
+    is_direct_mp4 = url.lower().split('?')[0].endswith('.mp4')
+    
+    success = False
+    actual_file = None
 
-        # Find the actual filename (it might have changed extension or added IDs)
-        # We look for the most recent file in media/
-        files = [os.path.join('media', f) for f in os.listdir('media') if os.path.isfile(os.path.join('media', f))]
-        files.sort(key=os.path.getmtime, reverse=True)
-        
-        if files:
-            actual_file = files[0]
+    try:
+        if is_direct_mp4:
+            # For direct MP4s, curl is often more reliable than yt-dlp 
+            # especially with custom leecher sites
+            ext = "mp4"
+            filename = f"{title}.{ext}" if title else f"video_{int(time.time())}.{ext}"
+            file_path = os.path.join('media', filename)
+            
+            print(f"📦 Direct MP4 detected, using curl...")
+            curl_cmd = [
+                'curl', '-L', 
+                '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                '-o', file_path,
+                url
+            ]
+            result = subprocess.run(curl_cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                success = True
+                actual_file = file_path
+
+        if not success:
+            # Fallback to yt-dlp
+            print(f"🎬 Using yt-dlp for download...")
+            cmd = [
+                'yt-dlp',
+                '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                '--merge-output-format', 'mp4',
+                '-o', output_template,
+                url
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                # Find the most recent file
+                files = [os.path.join('media', f) for f in os.listdir('media') if os.path.isfile(os.path.join('media', f))]
+                files.sort(key=os.path.getmtime, reverse=True)
+                if files:
+                    actual_file = files[0]
+                    success = True
+
+        if success and actual_file:
             actual_title = title if title else os.path.splitext(os.path.basename(actual_file))[0]
             add_to_catalog(actual_title, actual_file)
             print(f"🎉 Success! File saved to {actual_file}")
+        else:
+            print(f"❌ Failed to download video from {url}")
         
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
