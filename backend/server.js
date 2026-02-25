@@ -345,9 +345,15 @@ wss.on('connection', (ws) => {
                     console.log(`[DELETE] Successfully deleted file: ${fullPath}`);
                   } else {
                     console.warn(`[DELETE] File not found on disk: ${fullPath}`);
+                    // Not a fatal error if already gone from disk
                   }
                 } catch (err) {
                   console.error(`[DELETE] Error unlinking file: ${err.message}`);
+                  ws.send(JSON.stringify({
+                    type: 'error',
+                    message: `فشل حذف الملف من القرص: ${err.message}`
+                  }));
+                  return;
                 }
               }
 

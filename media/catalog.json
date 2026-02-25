@@ -1,30 +1,6 @@
 [
   {
-    "category": "Movies",
-    "items": [
-      {
-        "id": "big-buck-bunny",
-        "name": "Big Buck Bunny (Test)",
-        "url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        "poster": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg"
-      },
-      {
-        "id": "sintel",
-        "name": "Sintel (Test)",
-        "url": "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
-        "poster": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Sintel_poster.jpg"
-      }
-    ]
-  },
-  {
     "category": "Live TV",
-    "items": [
-      {
-        "id": "nasa-tv",
-        "name": "NASA TV",
-        "url": "https://ntv1.akamaized.net/hls/live/2013530/NASA-TV-Public/master.m3u8",
-        "poster": "https://www.nasa.gov/sites/default/files/styles/side_image/public/thumbnails/image/nasa-tv-logo.jpg"
-      }
-    ]
+    "items": []
   }
 ]

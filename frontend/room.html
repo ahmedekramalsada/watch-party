@@ -641,7 +641,7 @@
         // --- CATALOG LOGIC ---
         async function loadCatalog() {
             try {
-                const response = await fetch('/live/catalog.json');
+                const response = await fetch(`/live/catalog.json?t=${Date.now()}`);
                 if (!response.ok) throw new Error('Failed to load catalog');
                 const uniqueCatalog = await response.json();
 
@@ -758,6 +758,7 @@
                     loadVideo(data.movie);
                     break;
                 case 'error':
+                    hideSyncIndicator(); // Clear any sticky loading messages
                     showSyncIndicator(`❌ ${data.message}`);
                     // Only show the webpage helper modal if it's NOT a download failure
                     if (data.code !== 'DOWNLOAD_FAILED') {
@@ -804,6 +805,7 @@
                     addSystemMessage(`${data.username} غادر 👋`);
                     break;
                 case 'library-updated':
+                    hideSyncIndicator(); // Clear sticky delete/download messages
                     loadCatalog();
                     // If the management modal is open, refresh its list too
                     if (document.getElementById('libraryManageModal').style.display === 'flex') {
@@ -825,15 +827,22 @@
         }
 
         let syncTimeout;
-        function showSyncIndicator(msg) {
+        function showSyncIndicator(msg, sticky = false) {
             if (syncTimeout) clearTimeout(syncTimeout);
 
             syncIndicator.textContent = msg;
             syncIndicator.style.display = 'block';
 
-            syncTimeout = setTimeout(() => {
-                syncIndicator.style.display = 'none';
-            }, 4000); // 4 seconds timeout
+            if (!sticky) {
+                syncTimeout = setTimeout(() => {
+                    syncIndicator.style.display = 'none';
+                }, 4000); // 4 seconds timeout
+            }
+        }
+
+        function hideSyncIndicator() {
+            if (syncTimeout) clearTimeout(syncTimeout);
+            syncIndicator.style.display = 'none';
         }
 
         // --- EVENTS ---
@@ -939,7 +948,7 @@
             list.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;">⏳ جاري فحص المخزن...</div>';
 
             try {
-                const response = await fetch('/live/catalog.json');
+                const response = await fetch(`/live/catalog.json?t=${Date.now()}`);
                 const catalog = await response.json();
                 list.innerHTML = '';
 
@@ -1006,8 +1015,8 @@
                 movieId: movieId
             }));
 
-            // UI feedback - show indicator until server confirms
-            showSyncIndicator('🗑️ جاري حذف الفيلم...');
+            // UI feedback - show sticky indicator until server confirms
+            showSyncIndicator('🗑️ جاري حذف الفيلم...', true);
         }
 
         function mainWebDownload() {
@@ -1020,7 +1029,7 @@
                 title: ''
             }));
 
-            showSyncIndicator('📥 بدأ التحميل في الخلفية...');
+            showSyncIndicator('📥 بدأ التحميل في الخلفية...', true);
             document.getElementById('mainWebDownloadUrl').value = '';
         }
 
