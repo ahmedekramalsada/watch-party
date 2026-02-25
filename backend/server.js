@@ -1,6 +1,6 @@
 const http = require('http');
 const WebSocket = require('ws');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { resolveUrl } = require('./resolvers');
@@ -217,30 +217,65 @@ wss.on('connection', (ws) => {
         case 'web-download':
           if (currentRoom) {
             const { url, title } = message;
-            console.log(`Web Download requested: ${url} (${title})`);
+            console.log(`[DOWNLOAD] Request: ${url} (${title || 'no title'})`);
 
-            // Execute the python script
-            const cmd = `python3 add_movie.py "${url.replace(/"/g, '\\"')}" ${title ? `--title "${title.replace(/"/g, '\\"')}"` : ''}`;
-            exec(cmd, { cwd: path.join(__dirname, '..') }, (error, stdout, stderr) => {
-              if (error) {
-                console.error(`[DOWNLOAD] Error for ${url}: ${stderr}`);
-                // Send specific error type to avoid webpage helper modal
+            const runDownload = (pythonCmd) => {
+              const args = ['add_movie.py', url];
+              if (title) args.push('--title', title);
+
+              console.log(`[DOWNLOAD] Spawning: ${pythonCmd} ${args.join(' ')}`);
+              const child = spawn(pythonCmd, args, {
+                cwd: path.join(__dirname, '..'),
+                env: process.env
+              });
+
+              let output = '';
+              let errorOutput = '';
+
+              child.stdout.on('data', (data) => {
+                output += data.toString();
+              });
+
+              child.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+              });
+
+              child.on('error', (err) => {
+                console.error(`[DOWNLOAD] Spawn error:`, err);
+                if (pythonCmd === 'python3') {
+                  console.log(`[DOWNLOAD] 'python3' failed, trying 'python'...`);
+                  return runDownload('python');
+                }
                 ws.send(JSON.stringify({
                   type: 'error',
-                  code: 'DOWNLOAD_FAILED',
-                  message: 'فشل التحميل. قد يكون الرابط منتهياً أو محمياً.'
+                  code: 'ENV_ERROR',
+                  message: 'فشل التشغيل: لم يتم العثور على Python في النظام.'
                 }));
-                return;
-              }
-              console.log(`[DOWNLOAD] Success for ${url}`);
-              broadcastToRoom(currentRoom, {
-                type: 'chat',
-                username: 'System',
-                message: `✅ تم تحميل وإضافة: ${title || 'فيديو جديد'}`,
-                timestamp: Date.now()
               });
-              broadcastToRoom(currentRoom, { type: 'library-updated' });
-            });
+
+              child.on('close', (code) => {
+                if (code !== 0) {
+                  console.error(`[DOWNLOAD] Failed with code ${code}. Stderr: ${errorOutput}`);
+                  ws.send(JSON.stringify({
+                    type: 'error',
+                    code: 'DOWNLOAD_FAILED',
+                    message: 'فشل التحميل. الرابط قد يكون منتهياً أو محمياً.'
+                  }));
+                  return;
+                }
+
+                console.log(`[DOWNLOAD] Finished successfully. Stdout: ${output}`);
+                broadcastToRoom(currentRoom, {
+                  type: 'chat',
+                  username: 'System',
+                  message: `✅ تم تحميل وإضافة: ${title || 'فيديو جديد'}`,
+                  timestamp: Date.now()
+                });
+                broadcastToRoom(currentRoom, { type: 'library-updated' });
+              });
+            };
+
+            runDownload('python3');
           }
           break;
 
