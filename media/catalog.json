@@ -2,5 +2,16 @@
   {
     "category": "Live TV",
     "items": []
+  },
+  {
+    "category": "Downloaded",
+    "items": [
+      {
+        "id": "jujutsu-kaisen-test",
+        "name": "Jujutsu Kaisen Test",
+        "url": "/live/Jujutsu Kaisen Test.mp4",
+        "poster": ""
+      }
+    ]
   }
 ]
