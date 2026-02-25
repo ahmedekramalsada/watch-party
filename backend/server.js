@@ -220,22 +220,25 @@ wss.on('connection', (ws) => {
             console.log(`Web Download requested: ${url} (${title})`);
 
             // Execute the python script
-            const cmd = `python3 add_movie.py "${url}" ${title ? `--title "${title}"` : ''}`;
+            const cmd = `python3 add_movie.py "${url.replace(/"/g, '\\"')}" ${title ? `--title "${title.replace(/"/g, '\\"')}"` : ''}`;
             exec(cmd, { cwd: path.join(__dirname, '..') }, (error, stdout, stderr) => {
               if (error) {
-                console.error(`Download error: ${stderr}`);
-                ws.send(JSON.stringify({ type: 'error', message: 'فشل التحميل: ' + stderr }));
+                console.error(`[DOWNLOAD] Error for ${url}: ${stderr}`);
+                // Send specific error type to avoid webpage helper modal
+                ws.send(JSON.stringify({
+                  type: 'error',
+                  code: 'DOWNLOAD_FAILED',
+                  message: 'فشل التحميل. قد يكون الرابط منتهياً أو محمياً.'
+                }));
                 return;
               }
-              console.log(`Download success: ${stdout}`);
-              // Notify everyone that library updated
+              console.log(`[DOWNLOAD] Success for ${url}`);
               broadcastToRoom(currentRoom, {
                 type: 'chat',
                 username: 'System',
-                message: `✅ تم تحميل وإضافة: ${title || 'فيلم جديد'}`,
+                message: `✅ تم تحميل وإضافة: ${title || 'فيديو جديد'}`,
                 timestamp: Date.now()
               });
-              // Force clients to reload catalog would be nice, but they can just refresh or we can send a signal
               broadcastToRoom(currentRoom, { type: 'library-updated' });
             });
           }

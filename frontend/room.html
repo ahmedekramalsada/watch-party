@@ -305,7 +305,8 @@
             <div class="video-controls">
                 <button class="btn btn-small" onclick="forceSync()">⚡ مزامنة إجبارية</button>
                 <button class="btn btn-small" onclick="copyRoomLink()">📋 نسخ رابط الغرفة</button>
-                <button class="btn btn-small" onclick="openLibraryManager()">⚙️ إدارة المكتبة</button>
+                <button class="btn btn-small" onclick="openLibraryManager()" title="إدارة الأفلام المحملة">⚙️ إدارة
+                    المكتبة</button>
                 <button class="btn btn-small btn-danger" onclick="leaveRoom()">🚪 مغادرة</button>
             </div>
         </div>
@@ -650,7 +651,10 @@
                     break;
                 case 'error':
                     showSyncIndicator(`❌ ${data.message}`);
-                    document.getElementById('linkHelperModal').style.display = 'flex';
+                    // Only show the webpage helper modal if it's NOT a download failure
+                    if (data.code !== 'DOWNLOAD_FAILED') {
+                        document.getElementById('linkHelperModal').style.display = 'flex';
+                    }
                     break;
                 case 'sync':
                     if (!isBuffering) syncVideo(data);
@@ -693,6 +697,10 @@
                     break;
                 case 'library-updated':
                     loadCatalog();
+                    // If the management modal is open, refresh its list too
+                    if (document.getElementById('libraryManageModal').style.display === 'flex') {
+                        populateManagementList();
+                    }
                     break;
             }
         }
@@ -865,9 +873,8 @@
                 movieId: movieId
             }));
 
-            // UI feedback
-            showSyncIndicator('🗑️ جاري الحذف...');
-            setTimeout(populateManagementList, 1000);
+            // UI feedback - show indicator until server confirms
+            showSyncIndicator('🗑️ جاري حذف الفيلم...');
         }
 
         function mainWebDownload() {

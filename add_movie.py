@@ -97,11 +97,14 @@ def download_video(url, title):
             actual_title = title if title else os.path.splitext(os.path.basename(actual_file))[0]
             add_to_catalog(actual_title, actual_file)
             print(f"🎉 Success! File saved to {actual_file}")
+            sys.exit(0)
         else:
             print(f"❌ Failed to download video from {url}")
+            sys.exit(1)
         
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download video and add to Watch Party catalog.')
