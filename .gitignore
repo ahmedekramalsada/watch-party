@@ -1,0 +1,7 @@
+node_modules/
+media/*.mp4
+media/*.mkv
+media/*.ts
+media/*.m3u8
+.DS_Store
+*.log

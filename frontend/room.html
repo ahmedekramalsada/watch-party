@@ -148,19 +148,40 @@
         }
 
         .modal-content {
-            background: #1e1e1e;
-            padding: 30px;
-            border-radius: 12px;
-            max-width: 600px;
-            width: 100%;
-            border: 1px solid #444;
+            background: rgba(30, 30, 30, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 40px;
+            border-radius: 24px;
+            max-width: 650px;
+            width: 95%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             color: white;
             position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
         .modal-content h2 {
             color: #f39c12;
             margin-top: 0;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-content h3 {
+            font-size: 1.1em;
+            color: #aaa;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .modal-content p {
+            color: #888;
+            font-size: 0.95em;
+            line-height: 1.5;
         }
 
         .modal-content ol {
@@ -178,55 +199,115 @@
 
         .btn-close-modal {
             position: absolute;
-            top: 15px;
-            right: 15px;
-            background: none;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.05);
             border: none;
-            color: #888;
-            font-size: 1.5em;
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
             cursor: pointer;
+            transition: background 0.2s;
         }
 
-        /* Library Management Modal */
+        .btn-close-modal:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Library Management Modal Upgrade */
         .management-list {
             margin-top: 20px;
-            max-height: 300px;
+            max-height: 350px;
             overflow-y: auto;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .management-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #222;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            transition: background 0.2s;
+            border: 1px solid transparent;
         }
 
-        .management-item:last-child {
-            border-bottom: none;
+        .management-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .management-title-box {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .management-title {
+            font-weight: 600;
+            color: #efefef;
+        }
+
+        .management-meta {
+            font-size: 0.75em;
+            color: #666;
+            font-family: monospace;
         }
 
         .btn-delete {
-            background: #c0392b;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
+            background: rgba(192, 57, 43, 0.15);
+            color: #e74c3c;
+            border: 1px solid rgba(192, 57, 43, 0.3);
+            padding: 8px 16px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.8em;
+            font-size: 0.85em;
+            transition: all 0.2s;
         }
 
         .btn-delete:hover {
-            background: #e74c3c;
+            background: #c0392b;
+            color: white;
+            box-shadow: 0 4px 12px rgba(192, 57, 43, 0.3);
         }
 
         .management-input-group {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px;
+            border-radius: 12px;
+            gap: 6px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .management-input-group input {
+            background: transparent !important;
+            border: none !important;
+            padding: 10px !important;
+        }
+
+        .storage-notice {
+            margin-top: 25px;
+            background: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.2);
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            color: #3498db;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
     </style>
 </head>
@@ -328,21 +409,34 @@
 
     <!-- LIBRARY MANAGEMENT MODAL -->
     <div id="libraryManageModal"
-        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;">
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;">
         <div class="modal-content">
             <button class="btn-close-modal" onclick="closeLibraryManager()">×</button>
-            <h2>⚙️ إدارة المكتبة</h2>
+            <h2>⚙️ إدارة المكتبة المحملة</h2>
 
-            <h3>📥 تحميل فيديو جديد</h3>
+            <h3>📥 إضافة محتوى جديد للمخزن</h3>
             <div class="management-input-group">
-                <input type="text" id="webDownloadUrl" placeholder="أدخل رابط التحميل هنا..." style="flex: 2;">
-                <input type="text" id="webDownloadTitle" placeholder="عنوان الفيلم" style="flex: 1;">
-                <button class="btn btn-primary" onclick="webDownloadVideo()">بدء التحميل</button>
+                <input type="text" id="webDownloadUrl" placeholder="أدخل رابط الفيلم المباشر..." style="flex: 2;">
+                <input type="text" id="webDownloadTitle" placeholder="اسم الفيلم اختياري" style="flex: 1;">
+                <button class="btn btn-primary" onclick="webDownloadVideo()">تحميل 💾</button>
             </div>
 
-            <h3>🗑️ حذف من المكتبة</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; border: none; padding: 0;">🎥 الملفات الموجودة حالياً</h3>
+                <span id="libraryCount" style="font-size: 0.8em; color: #666;">(0 ملفات)</span>
+            </div>
+
             <div id="managementList" class="management-list">
                 <!-- Items will be populated here -->
+            </div>
+
+            <div class="storage-notice">
+                <span style="font-size: 1.5em;">📂</span>
+                <div>
+                    <strong>أين تجد الأفلام؟</strong><br>
+                    يتم تخزين جميع الفيديوهات المحملة في مجلد المحتويات <code>media/</code> بجانب ملفات المشروع على
+                    جهازك.
+                </div>
             </div>
         </div>
     </div>
@@ -841,30 +935,47 @@
 
         async function populateManagementList() {
             const list = document.getElementById('managementList');
-            list.innerHTML = '<p style="text-align: center;">جاري التحميل...</p>';
+            const countLabel = document.getElementById('libraryCount');
+            list.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;">⏳ جاري فحص المخزن...</div>';
 
             try {
                 const response = await fetch('/live/catalog.json');
                 const catalog = await response.json();
                 list.innerHTML = '';
 
+                let total = 0;
                 catalog.forEach(cat => {
                     cat.items.forEach(movie => {
+                        total++;
                         const div = document.createElement('div');
                         div.className = 'management-item';
+
+                        // Extract filename for meta info
+                        const filename = movie.url.split('/').pop();
+
                         div.innerHTML = `
-                            <span>${movie.name} <small style="color: #666;">(${cat.category})</small></span>
-                            <button class="btn-delete" onclick="webDeleteMovie('${movie.id}')">حذف</button>
+                            <div class="management-title-box">
+                                <span class="management-title">${movie.name}</span>
+                                <span class="management-meta">📁 ${filename} • ${cat.category}</span>
+                            </div>
+                            <button class="btn-delete" onclick="webDeleteMovie('${movie.id}')">حذف نهائي</button>
                         `;
                         list.appendChild(div);
                     });
                 });
 
-                if (list.innerHTML === '') {
-                    list.innerHTML = '<p style="text-align: center; color: #888;">المكتبة فارغة</p>';
+                countLabel.textContent = `(${total} ملفات)`;
+
+                if (total === 0) {
+                    list.innerHTML = `
+                        <div style="padding: 60px 40px; text-align: center;">
+                            <span style="font-size: 3em; display: block; margin-bottom: 10px;">📦</span>
+                            <span style="color: #666;">المخزن فارغ حالياً.<br>أضف روابط لتحميلها للمشاهدة لاحقاً.</span>
+                        </div>
+                    `;
                 }
             } catch (e) {
-                list.innerHTML = '<p style="text-align: center; color: #e74c3c;">خطأ في تحميل القائمة</p>';
+                list.innerHTML = '<div style="padding: 40px; text-align: center; color: #e74c3c;">❌ فشل في الاتصال بقاعدة البيانات</div>';
             }
         }
 

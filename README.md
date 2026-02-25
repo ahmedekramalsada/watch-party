@@ -10,8 +10,10 @@ A modern, high-performance **Watch Party** application that lets you watch movie
 -   **⚡ Force Sync Button**: One click to pull everyone to your exact timestamp if they fall behind.
 -   **⏳ Smart Anti-Lag**: If anyone buffers, the video pauses for everyone automatically to keep the group together.
 -   **💬 Live Chat**: Chat with your friends while watching.
--   **📚 Link Library**: Easily curate your movie list by editing a simple JSON file.
--   **🔗 Direct Link & Local Support**: Paste any `.m3u8` or `.mp4` link directly in the room, or play local files placed in the `media/` folder.
+-   **📚 Premium Library Management**: A dedicated UI to manage your downloads directly from the room.
+-   **📥 Background Downloads**: Start a download for any MP4 link, and it will be added to your local library automatically.
+-   **📂 Local Storage Transparency**: View and manage files stored in your local `media/` folder through the UI.
+-   **🔗 Direct Link & HLS Support**: Seamless synchronization for both external streams and local files.
 -   **📱 Responsive Design**: Works beautifully on Desktop, Mobile, and Tablets.
 
 ---
@@ -78,12 +80,12 @@ To watch local MP4 files:
 You can easily add videos to your local storage to ensure they never expire.
 
 ### ⚡ Automated Download (Recommended)
-We provide a helper script to download and add movies automatically:
+You can download videos directly from the Web UI using the **"تحميل للمخزن"** (Download to Storage) feature, or via the helper script:
 ```bash
 # Download a video and add it to the catalog
 python3 add_movie.py "https://example.com/video.mp4" --title "My Movie"
 ```
-*Note: This requires `yt-dlp` installed (`pip install yt-dlp`).*
+*Note: This requires `yt-dlp` or `curl` on the server.*
 
 ### 🛠️ Manual Download
 If you prefer to do it yourself:
