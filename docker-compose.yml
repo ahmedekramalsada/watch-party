@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # SRS Media Server - handles RTMP/HLS streaming
+  srs:
+    image: ossrs/srs:5
+    container_name: watchparty-srs
+    volumes:
+      - ./media:/usr/local/srs/objs/nginx/html/live
+    environment:
+      - CANDIDATE=${SERVER_IP:-127.0.0.1}
+    ports:
+      - "1935:1935" # RTMP
+      - "8080:8080" # HTTP API
+      - "1985:1985" # HTTP API
+    restart: unless-stopped
+    networks:
+      - watchparty
+
+  # WebSocket server for sync
+  websocket:
+    build:
+      context: ./backend
+    container_name: watchparty-ws
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    networks:
+      - watchparty
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+    container_name: watchparty-frontend
+    restart: unless-stopped
+    networks:
+      - watchparty
+
+  # NGINX Reverse Proxy
+  nginx:
+    build:
+      context: ./nginx
+    container_name: watchparty-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - srs
+      - websocket
+      - frontend
+    restart: unless-stopped
+    networks:
+      - watchparty
+
+networks:
+  watchparty:
+    driver: bridge

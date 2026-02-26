@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Party Room 🎬</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        /* Lobby Overlay */
+        #lobbyOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            color: white;
+            text-align: center;
+        }
+
+        #lobbyOverlay h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .lobby-input {
+            padding: 15px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            margin-bottom: 20px;
+            width: 250px;
+            text-align: center;
+        }
+
+        .btn-join {
+            padding: 15px 40px;
+            font-size: 1.5em;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            box-shadow: 0 0 20px rgba(39, 174, 96, 0.5);
+        }
+
+        .btn-join:hover {
+            transform: scale(1.1);
+            background: #2ecc71;
+        }
+
+        /* Movie Selector & Custom Link */
+        .movie-selector {
+            margin: 15px auto;
+            padding: 15px;
+            background: rgba(42, 42, 42, 0.9);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 800px;
+            width: 90%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .selector-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .movie-selector label {
+            font-weight: bold;
+            min-width: 80px;
+            color: #ddd;
+        }
+
+        .movie-selector select,
+        .movie-selector input {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 6px;
+            background: #1a1a1a;
+            color: white;
+            border: 1px solid #444;
+            font-size: 1em;
+            outline: none;
+        }
+
+        .btn-play {
+            padding: 10px 20px;
+            background: #f39c12;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-play:hover {
+            background: #e67e22;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            width: 100%;
+        }
+
+        .movie-info {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin-top: 5px;
+        }
+
+        .movie-poster {
+            width: 80px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        /* Link Helper Modal */
+        #linkHelperModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: rgba(30, 30, 30, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 40px;
+            border-radius: 24px;
+            max-width: 650px;
+            width: 95%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content h2 {
+            color: #f39c12;
+            margin-top: 0;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-content h3 {
+            font-size: 1.1em;
+            color: #aaa;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .modal-content p {
+            color: #888;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .modal-content ol {
+            padding-right: 20px;
+            line-height: 1.6;
+        }
+
+        .modal-content kbd {
+            background: #333;
+            border: 1px solid #555;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .btn-close-modal {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-close-modal:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Library Management Modal Upgrade */
+        .management-list {
+            margin-top: 20px;
+            max-height: 350px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .management-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            transition: background 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .management-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .management-title-box {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .management-title {
+            font-weight: 600;
+            color: #efefef;
+        }
+
+        .management-meta {
+            font-size: 0.75em;
+            color: #666;
+            font-family: monospace;
+        }
+
+        .btn-delete {
+            background: rgba(192, 57, 43, 0.15);
+            color: #e74c3c;
+            border: 1px solid rgba(192, 57, 43, 0.3);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: #c0392b;
+            color: white;
+            box-shadow: 0 4px 12px rgba(192, 57, 43, 0.3);
+        }
+
+        .management-input-group {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px;
+            border-radius: 12px;
+            gap: 6px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .management-input-group input {
+            background: transparent !important;
+            border: none !important;
+            padding: 10px !important;
+        }
+
+        .storage-notice {
+            margin-top: 25px;
+            background: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.2);
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            color: #3498db;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+    </style>
+</head>
+
+<body class="room-page">
+
+    <!-- LOBBY OVERLAY -->
+    <div id="lobbyOverlay">
+        <h1>🎬 Watch Party</h1>
+        <p>مرحباً بك في الغرفة <span id="lobbyRoomName">...</span></p>
+
+        <input type="text" id="usernameInput" class="lobby-input" placeholder="أدخل اسمك هنا">
+
+        <button class="btn-join" onclick="joinRoom()">انضم للغرفة 🚀</button>
+        <p style="margin-top: 10px; color: #888; font-size: 0.9em;">اضغط للبدء (مطلوب للمزامنة)</p>
+    </div>
+
+    <!-- MAIN APP -->
+    <div class="room-container" id="appContainer" style="filter: blur(5px);">
+        <!-- Video Section -->
+        <div class="video-section">
+            <div class="video-header">
+                <h2>غرفة: <span id="roomName"></span></h2>
+                <div class="users-count">
+                    <span id="userCount">0</span> 👥
+                </div>
+            </div>
+
+            <!-- Library & Custom Link -->
+            <div class="movie-selector">
+                <!-- Dropdown -->
+                <div class="selector-row">
+                    <label>📚 المكتبة:</label>
+                    <select id="movieSelect" onchange="changeMovie()">
+                        <option value="" disabled selected>جاري تحميل المكتبة...</option>
+                    </select>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Custom Link -->
+                <div class="selector-row">
+                    <label>🔗 رابط خارجي:</label>
+                    <input type="text" id="customUrlInput" placeholder="https://example.com/video.mp4">
+                    <button class="btn-play" onclick="playCustomLink()">تشغيل</button>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Web Download from main UI -->
+                <div class="selector-row">
+                    <label>📥 تحميل للمخزن:</label>
+                    <input type="text" id="mainWebDownloadUrl" placeholder="الصق الرابط للتحميل...">
+                    <button class="btn-play" style="background: #27ae60;" onclick="mainWebDownload()">تحميل 💾</button>
+                    <button class="btn-play" style="background: #3498db;" onclick="openLibraryManager()">⚙️
+                        إدارة</button>
+                </div>
+
+                <!-- Info Display -->
+                <div class="movie-info" id="movieInfo">
+                    <img id="posterImg" class="movie-poster" src="" alt="Poster">
+                    <div style="flex-grow: 1;">
+                        <h3 id="currentTitle" style="margin: 0;">اختر فيلماً</h3>
+                        <p id="currentUrl" style="font-size: 0.8em; color: #aaa; word-break: break-all;"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="video-wrapper">
+                <video id="video" controls playsinline referrerpolicy="no-referrer"></video>
+                <div class="sync-indicator" id="syncIndicator">
+                    🔄 جاري المزامنة...
+                </div>
+            </div>
+
+            <div class="video-controls">
+                <button class="btn btn-small" onclick="forceSync()">⚡ مزامنة إجبارية</button>
+                <button class="btn btn-small" onclick="copyRoomLink()">📋 نسخ رابط الغرفة</button>
+                <button class="btn btn-small" onclick="openLibraryManager()" title="إدارة الأفلام المحملة">⚙️ إدارة
+                    المكتبة</button>
+                <button class="btn btn-small btn-danger" onclick="leaveRoom()">🚪 مغادرة</button>
+            </div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-section">
+            <div class="chat-header">
+                <h3>💬 الشات</h3>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="اكتب رسالة..."
+                    onkeypress="handleMessageKeypress(event)">
+                <button class="btn btn-primary" onclick="sendMessage()">إرسال 📤</button>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- LIBRARY MANAGEMENT MODAL -->
+    <div id="libraryManageModal"
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;">
+        <div class="modal-content">
+            <button class="btn-close-modal" onclick="closeLibraryManager()">×</button>
+            <h2>⚙️ إدارة المكتبة المحملة</h2>
+
+            <h3>📥 إضافة محتوى جديد للمخزن</h3>
+            <div class="management-input-group">
+                <input type="text" id="webDownloadUrl" placeholder="أدخل رابط الفيلم المباشر..." style="flex: 2;">
+                <input type="text" id="webDownloadTitle" placeholder="اسم الفيلم اختياري" style="flex: 1;">
+                <button class="btn btn-primary" onclick="webDownloadVideo()">تحميل 💾</button>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; border: none; padding: 0;">🎥 الملفات الموجودة حالياً</h3>
+                <span id="libraryCount" style="font-size: 0.8em; color: #666;">(0 ملفات)</span>
+            </div>
+
+            <div id="managementList" class="management-list">
+                <!-- Items will be populated here -->
+            </div>
+
+            <div class="storage-notice">
+                <span style="font-size: 1.5em;">📂</span>
+                <div>
+                    <strong>أين تجد الأفلام؟</strong><br>
+                    يتم تخزين جميع الفيديوهات المحملة في مجلد المحتويات <code>media/</code> بجانب ملفات المشروع على
+                    جهازك.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LINK HELPER MODAL -->
+    <div id="linkHelperModal">
+        <div class="modal-content">
+            <button class="btn-close-modal" onclick="closeLinkHelper()">×</button>
+            <h2>🔗 الرابط غير صالح للمشاهدة</h2>
+            <p>يبدو أنك قمت بنسخ رابط <strong>صفحة ويب</strong> بدلاً من رابط <strong>الفيديو المباشر</strong>. المشغل
+                يحتاج إلى رابط ينتهي بـ (.mp4) أو (.m3u8).</p>
+
+            <h3>كيف تحصل على الرابط الصحيح من الموقع؟</h3>
+            <ol>
+                <li>افتح صفحة الفيديو في متصفحك.</li>
+                <li>اضغط بيمين الماوس واختر <strong>Inspect (فحص)</strong> أو اضغط <kbd>F12</kbd>.</li>
+                <li>اذهب إلى تبويب <strong>Network (الشبكة)</strong>.</li>
+                <li>ابحث في خانة البحث عن <code>m3u8</code> أو <code>mp4</code>.</li>
+                <li>قم بتشغيل الفيديو، سيظهر لك رابط جديد.</li>
+                <li>اضغط بيمين الماوس عليه واختر <strong>Copy link address</strong>.</li>
+            </ol>
+            <button class="btn btn-primary" style="width: 100%;" onclick="closeLinkHelper()">فهمت، سأبحث عن
+                الرابط</button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room');
+        let username = urlParams.get('username');
+
+        if (!roomId) {
+            alert('معلومات الغرفة غير صحيحة');
+            window.location.href = 'index.html';
+        }
+
+        document.getElementById('roomName').textContent = roomId;
+        document.getElementById('lobbyRoomName').textContent = roomId;
+
+        // Setup Logic for Username
+        const usernameInput = document.getElementById('usernameInput');
+        if (username) {
+            usernameInput.value = username;
+        }
+
+        const video = document.getElementById('video');
+        const chatMessages = document.getElementById('chatMessages');
+        const syncIndicator = document.getElementById('syncIndicator');
+        const movieSelect = document.getElementById('movieSelect');
+        const customUrlInput = document.getElementById('customUrlInput');
+        const posterImg = document.getElementById('posterImg');
+
+        let ws;
+        let isConnected = false;
+        let isSyncing = false;
+        let isBuffering = false;
+        let hls;
+        let currentMovie = null;
+        let pendingMovieId = null;
+        let retryCount = 0;
+
+        // --- LOBBY LOGIC ---
+        function joinRoom() {
+            const nameVal = usernameInput.value.trim();
+            if (!nameVal) {
+                alert("الرجاء إدخال اسمك");
+                return;
+            }
+            username = nameVal;
+
+            // Unlock Audio Context
+            const overlay = document.getElementById('lobbyOverlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+            document.getElementById('appContainer').style.filter = 'none';
+
+            // Connect
+            connectWebSocket();
+        }
+
+        // --- PLAYER LOGIC ---
+        function loadVideo(movie) {
+            if (currentMovie && currentMovie.url === movie.url) return;
+
+            currentMovie = movie;
+            const url = movie.url;
+            console.log('Loading:', url);
+            retryCount = 0;
+
+            document.getElementById('currentTitle').textContent = movie.name;
+            document.getElementById('currentUrl').textContent = url;
+            if (movie.poster) {
+                posterImg.src = movie.poster;
+                posterImg.style.display = 'block';
+            } else {
+                posterImg.style.display = 'none';
+            }
+
+            // Reset Inputs
+            if (movie.type === 'catalog') {
+                syncDropdown(movie.id);
+                customUrlInput.value = '';
+            } else {
+                movieSelect.selectedIndex = -1;
+                customUrlInput.value = movie.url;
+            }
+
+            const isHLS = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('master.m3u8') || url.toLowerCase().includes('playlist.m3u8');
+
+            if (Hls.isSupported() && isHLS) {
+                video.removeAttribute('crossorigin');
+                if (hls) hls.destroy();
+                hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    xhrSetup: function (xhr, url) {
+                        xhr.withCredentials = false;
+                    }
+                });
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('Manifest loaded');
+                });
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        console.error('HLS Fatal Error:', data.type);
+                        switch (data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                showSyncIndicator('❌ خطأ في الشبكة (قد يكون الرابط منتهي أو محمي)');
+                                reportPlaybackError(`HLS Network Error (${data.details})`);
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                showSyncIndicator('❌ خطأ في تشغيل المقطع');
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                showSyncIndicator('❌ فشل تشغيل الرابط');
+                                reportPlaybackError(`HLS Error (${data.type})`);
+                                hls.destroy();
+                                break;
+                        }
+                    }
+                });
+            } else {
+                if (hls) { hls.destroy(); hls = null; }
+                video.removeAttribute('crossorigin');
+                video.src = url;
+            }
+        }
+
+        function reportPlaybackError(errorType) {
+            if (isConnected) {
+                ws.send(JSON.stringify({
+                    type: 'chat',
+                    message: `⚠️ تنبيه: فشل تحميل الفيديو عندي (${errorType}).`
+                }));
+            }
+        }
+
+        video.onerror = () => {
+            if (video.src && video.src !== window.location.href) {
+                let errDetail = "Unknown Error";
+                if (video.error) {
+                    switch (video.error.code) {
+                        case 1: errDetail = "Aborted"; break;
+                        case 2: errDetail = "Network Error"; break;
+                        case 3: errDetail = "Decode Error"; break;
+                        case 4: errDetail = "Source Not Supported / Access Denied"; break;
+                    }
+                }
+                console.error("Native Video Error:", errDetail, video.error);
+
+                if (!video.getAttribute('crossorigin') && retryCount < 1) {
+                    console.log("Retrying with CORS anonymous...");
+                    retryCount++;
+                    video.setAttribute('crossorigin', 'anonymous');
+                    video.load();
+                    return;
+                }
+
+                showSyncIndicator('❌ فشل تحميل الفيديو (قد يكون الرابط محمي أو منتهي)');
+                reportPlaybackError(errDetail);
+            }
+        };
+
+        function syncDropdown(id) {
+            for (let i = 0; i < movieSelect.options.length; i++) {
+                try {
+                    const val = movieSelect.options[i].value;
+                    if (!val) continue;
+                    const m = JSON.parse(val);
+                    if (m.id === id) {
+                        movieSelect.selectedIndex = i;
+                        return;
+                    }
+                } catch (e) { }
+            }
+            pendingMovieId = id;
+        }
+
+        // --- CATALOG LOGIC ---
+        async function loadCatalog() {
+            try {
+                const response = await fetch(`/live/catalog.json?t=${Date.now()}`);
+                if (!response.ok) throw new Error('Failed to load catalog');
+                const uniqueCatalog = await response.json();
+
+                movieSelect.innerHTML = '<option value="" disabled selected>-- اختر للمشاهدة --</option>';
+
+                uniqueCatalog.forEach(cat => {
+                    const group = document.createElement('optgroup');
+                    group.label = cat.category;
+                    cat.items.forEach(movie => {
+                        const m = { ...movie, type: 'catalog' };
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify(m);
+                        option.text = movie.name;
+                        group.appendChild(option);
+                    });
+                    movieSelect.add(group);
+                });
+
+                if (pendingMovieId) {
+                    syncDropdown(pendingMovieId);
+                    pendingMovieId = null;
+                }
+
+            } catch (err) {
+                console.error(err);
+                movieSelect.innerHTML = '<option>خطأ في تحميل المكتبة</option>';
+            }
+        }
+
+        loadCatalog();
+
+        function changeMovie() {
+            if (!isConnected) return;
+            try {
+                const movie = JSON.parse(movieSelect.value);
+                ws.send(JSON.stringify({ type: 'change-movie', movie }));
+            } catch (e) { }
+        }
+
+        function playCustomLink() {
+            if (!isConnected) return;
+            const url = customUrlInput.value.trim();
+            if (!url) return alert("الرجاء إدخال رابط");
+
+            // Webpage detection
+            const isWebpage = !url.toLowerCase().split('?')[0].match(/\.(mp4|m3u8|mkv|mov|avi)$/) &&
+                (url.includes('.html') || url.includes('.php') || !url.includes('.'));
+
+            if (isWebpage) {
+                showSyncIndicator('✨ جاري استخراج الفيديو تلقائيًا...');
+                ws.send(JSON.stringify({ type: 'resolve-url', url: url }));
+                return;
+            }
+
+            // Sync playback for direct links
+            const movie = {
+                type: 'url',
+                url: url,
+                name: 'رابط مباشر 🌐',
+                id: 'custom-' + Date.now()
+            };
+            ws.send(JSON.stringify({ type: 'change-movie', movie }));
+
+            // Advice for reliability
+            addSystemMessage('⚠️ ملاحظة: بعض الروابط المباشرة قد لا تعمل لدى الآخرين بسبب قيود الموقع الأصلي. يفضل استخدام التحميل للمخزن للمشاهدة الجماعية الثابتة.');
+        }
+
+        function closeLinkHelper() {
+            document.getElementById('linkHelperModal').style.display = 'none';
+        }
+
+        // --- WEBSOCKET ---
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            let wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            // Local Development Redirect
+            if (window.location.port === '8080' || window.location.port === '8081') {
+                wsUrl = `ws://${window.location.hostname}:3000/ws`;
+            }
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                isConnected = true;
+                ws.send(JSON.stringify({ type: 'join', roomId, username }));
+                addSystemMessage('🟢 متصل - جاهز للمشاهدة');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+
+            ws.onclose = () => {
+                isConnected = false;
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'state':
+                    if (data.currentMovie) {
+                        loadVideo(data.currentMovie);
+                    }
+                    if (data.userCount !== undefined) {
+                        updateUserCount(data.userCount);
+                    }
+                    syncVideo(data);
+                    break;
+                case 'movie-changed':
+                    addSystemMessage(`🎬 ${data.username} شغل: ${data.movie.name}`);
+                    loadVideo(data.movie);
+                    break;
+                case 'error':
+                    hideSyncIndicator(); // Clear any sticky loading messages
+                    showSyncIndicator(`❌ ${data.message}`);
+                    // Only show the webpage helper modal if it's NOT a download failure
+                    if (data.code !== 'DOWNLOAD_FAILED') {
+                        document.getElementById('linkHelperModal').style.display = 'flex';
+                    }
+                    break;
+                case 'sync':
+                    if (!isBuffering) syncVideo(data);
+                    break;
+                case 'force-sync':
+                    isSyncing = true;
+                    video.currentTime = data.time;
+                    if (data.action === 'play') video.play().catch(() => { });
+                    else video.pause();
+                    setTimeout(() => isSyncing = false, 1000);
+                    showSyncIndicator(`⚡ مزامنة إجبارية من ${data.username}`);
+                    break;
+                case 'buffering':
+                    if (data.action === 'start') {
+                        isBuffering = true;
+                        video.pause();
+                        showSyncIndicator(`⏳ ${data.username} يواجه بطئاً...`);
+                    } else {
+                        isBuffering = false;
+                        video.play().catch(() => { });
+                        showSyncIndicator(`▶️ استئناف`);
+                    }
+                    break;
+                case 'seek':
+                    isSyncing = true;
+                    video.currentTime = data.time;
+                    setTimeout(() => isSyncing = false, 500);
+                    showSyncIndicator(`${data.username} ⏩`);
+                    break;
+                case 'chat':
+                    addChatMessage(data.username, data.message);
+                    break;
+                case 'user-joined':
+                    updateUserCount(data.userCount);
+                    addSystemMessage(`${data.username} انضم 👋`);
+                    break;
+                case 'user-left':
+                    updateUserCount(data.userCount);
+                    addSystemMessage(`${data.username} غادر 👋`);
+                    break;
+                case 'library-updated':
+                    hideSyncIndicator(); // Clear sticky delete/download messages
+                    loadCatalog();
+                    // If the management modal is open, refresh its list too
+                    if (document.getElementById('libraryManageModal').style.display === 'flex') {
+                        populateManagementList();
+                    }
+                    break;
+            }
+        }
+
+        function syncVideo(data) {
+            const diff = Math.abs(video.currentTime - data.time);
+            if (diff > 2) video.currentTime = data.time;
+
+            if (data.action === 'play' && video.paused) {
+                video.play().catch(e => console.log('Autoplay:', e));
+            } else if (data.action === 'pause' && !video.paused) {
+                video.pause();
+            }
+        }
+
+        let syncTimeout;
+        function showSyncIndicator(msg, sticky = false) {
+            if (syncTimeout) clearTimeout(syncTimeout);
+
+            syncIndicator.textContent = msg;
+            syncIndicator.style.display = 'block';
+
+            if (!sticky) {
+                syncTimeout = setTimeout(() => {
+                    syncIndicator.style.display = 'none';
+                }, 4000); // 4 seconds timeout
+            }
+        }
+
+        function hideSyncIndicator() {
+            if (syncTimeout) clearTimeout(syncTimeout);
+            syncIndicator.style.display = 'none';
+        }
+
+        // --- EVENTS ---
+        video.onplay = () => sendSync('play');
+        video.onpause = () => sendSync('pause');
+        video.onseeked = () => {
+            if (!isSyncing && isConnected) {
+                ws.send(JSON.stringify({ type: 'seek', time: video.currentTime }));
+            }
+        };
+
+        // Buffering Events
+        let bufferTimeout;
+        video.onwaiting = () => {
+            if (isConnected && !isBuffering) {
+                // Debounce slightly to avoid flicker
+                bufferTimeout = setTimeout(() => {
+                    ws.send(JSON.stringify({ type: 'buffering', action: 'start' }));
+                }, 500);
+            }
+        };
+
+        video.onplaying = () => {
+            if (bufferTimeout) clearTimeout(bufferTimeout);
+            if (isConnected && isBuffering) {
+                // We were buffering, now we are good
+                ws.send(JSON.stringify({ type: 'buffering', action: 'end' }));
+            }
+        };
+
+        function sendSync(action) {
+            if (!isSyncing && isConnected && !isBuffering) {
+                ws.send(JSON.stringify({
+                    type: 'sync', action, time: video.currentTime
+                }));
+            }
+            video.onerror = () => {
+                if (video.src) {
+                    addSystemMessage('❌ خطأ في تشغيل الفيديو. قد يكون الرابط منتهياً أو محمياً.');
+                    showSyncIndicator('❌ خطأ في التشغيل');
+                }
+            };
+        }
+
+        function forceSync() {
+            if (!isConnected) return;
+            const action = video.paused ? 'pause' : 'play';
+            ws.send(JSON.stringify({
+                type: 'force-sync',
+                time: video.currentTime,
+                action: action
+            }));
+            showSyncIndicator('⚡ تم فرض المزامنة');
+        }
+
+        // --- UTILS ---
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const msg = input.value.trim();
+            if (msg && isConnected) {
+                ws.send(JSON.stringify({ type: 'chat', message: msg }));
+                addChatMessage(username, msg, true);
+                input.value = '';
+            }
+        }
+        function handleMessageKeypress(e) { if (e.key === 'Enter') sendMessage(); }
+
+        function addChatMessage(user, msg, own = false) {
+            const div = document.createElement('div');
+            div.className = `chat-message ${own ? 'own-message' : ''}`;
+            div.innerHTML = `<span class="message-user">${user}:</span> <span class="message-text">${msg}</span>`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        function addSystemMessage(msg) {
+            const div = document.createElement('div');
+            div.className = 'chat-message system-message';
+            div.innerText = msg;
+            chatMessages.appendChild(div);
+        }
+        function updateUserCount(count) {
+            const el = document.getElementById('userCount');
+            if (el) el.textContent = count;
+        }
+        function copyRoomLink() {
+            const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+            navigator.clipboard.writeText(cleanUrl);
+            alert('تم نسخ الرابط! (بدون اسمك) 📋');
+        }
+
+        function openLibraryManager() {
+            document.getElementById('libraryManageModal').style.display = 'flex';
+            populateManagementList();
+        }
+
+        function closeLibraryManager() {
+            document.getElementById('libraryManageModal').style.display = 'none';
+        }
+
+        async function populateManagementList() {
+            const list = document.getElementById('managementList');
+            const countLabel = document.getElementById('libraryCount');
+            list.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;">⏳ جاري فحص المخزن...</div>';
+
+            try {
+                const response = await fetch(`/live/catalog.json?t=${Date.now()}`);
+                const catalog = await response.json();
+                list.innerHTML = '';
+
+                let total = 0;
+                catalog.forEach(cat => {
+                    cat.items.forEach(movie => {
+                        total++;
+                        const div = document.createElement('div');
+                        div.className = 'management-item';
+
+                        // Extract filename for meta info
+                        const filename = movie.url.split('/').pop();
+
+                        div.innerHTML = `
+                            <div class="management-title-box">
+                                <span class="management-title">${movie.name}</span>
+                                <span class="management-meta">📁 ${filename} • ${cat.category}</span>
+                            </div>
+                            <button class="btn-delete" onclick="webDeleteMovie('${movie.id}')">حذف نهائي</button>
+                        `;
+                        list.appendChild(div);
+                    });
+                });
+
+                countLabel.textContent = `(${total} ملفات)`;
+
+                if (total === 0) {
+                    list.innerHTML = `
+                        <div style="padding: 60px 40px; text-align: center;">
+                            <span style="font-size: 3em; display: block; margin-bottom: 10px;">📦</span>
+                            <span style="color: #666;">المخزن فارغ حالياً.<br>أضف روابط لتحميلها للمشاهدة لاحقاً.</span>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                list.innerHTML = '<div style="padding: 40px; text-align: center; color: #e74c3c;">❌ فشل في الاتصال بقاعدة البيانات</div>';
+            }
+        }
+
+        function webDownloadVideo() {
+            const url = document.getElementById('webDownloadUrl').value.trim();
+            const title = document.getElementById('webDownloadTitle').value.trim();
+
+            if (!url) return alert('الرجاء إدخال رابط');
+
+            ws.send(JSON.stringify({
+                type: 'web-download',
+                url: url,
+                title: title
+            }));
+
+            alert('تم بدء عملية التحميل في الخلفية. ستصلك رسالة في الشات عند الانتهاء.');
+            closeLibraryManager();
+            document.getElementById('webDownloadUrl').value = '';
+            document.getElementById('webDownloadTitle').value = '';
+        }
+
+        function webDeleteMovie(movieId) {
+            if (!confirm('هل أنت متأكد من حذف هذا الفيلم؟ لا يمكن التراجع عن هذه الخطوة.')) return;
+
+            console.log('Requesting delete for:', movieId);
+            ws.send(JSON.stringify({
+                type: 'web-delete',
+                movieId: movieId
+            }));
+
+            // UI feedback - show sticky indicator until server confirms
+            showSyncIndicator('🗑️ جاري حذف الفيلم...', true);
+        }
+
+        function mainWebDownload() {
+            const url = document.getElementById('mainWebDownloadUrl').value.trim();
+            if (!url) return alert('الرجاء إدخال رابط');
+
+            ws.send(JSON.stringify({
+                type: 'web-download',
+                url: url,
+                title: ''
+            }));
+
+            showSyncIndicator('📥 بدأ التحميل في الخلفية...', true);
+            document.getElementById('mainWebDownloadUrl').value = '';
+        }
+
+        function leaveRoom() { location.href = 'index.html'; }
+    </script>
+</body>
+
+</html>
