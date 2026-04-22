@@ -22,18 +22,23 @@ services:
     build:
       context: ./backend
     container_name: watchparty-ws
+    ports:
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
     restart: unless-stopped
     networks:
       - watchparty
+      - default
 
   # Frontend
   frontend:
     build:
       context: ./frontend
     container_name: watchparty-frontend
+    ports:
+      - "3002:80"
     restart: unless-stopped
     networks:
       - watchparty
@@ -44,8 +49,8 @@ services:
       context: ./nginx
     container_name: watchparty-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "8081:80"
+      - "8443:443"
     depends_on:
       - srs
       - websocket
@@ -53,6 +58,7 @@ services:
     restart: unless-stopped
     networks:
       - watchparty
+      - default
 
 networks:
   watchparty:

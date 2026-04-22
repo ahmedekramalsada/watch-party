@@ -6,10 +6,104 @@ const path = require('path');
 const { resolveUrl } = require('./resolvers');
 const port = process.env.PORT || 3000;
 
-const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200);
-    res.end('OK');
+const server = http.createServer(async (req, res) => {
+  if (req.url === '/health' || req.url.startsWith('/ws')) {
+    res.writeHead(404);
+    res.end('WebSocket endpoint');
+  } else if (req.url.startsWith('/stream/')) {
+    const videoUrl = decodeURIComponent(req.url.slice(8));
+    console.log('[STREAM] Universal stream proxy:', videoUrl);
+    
+    const isM3U8 = videoUrl.includes('.m3u8') || videoUrl.includes('master.m3u8') || videoUrl.includes('playlist.m3u8');
+    
+    if (isM3U8) {
+      res.writeHead(200, {
+        'Content-Type': 'video/mp4',
+        'Access-Control-Allow-Origin': '*',
+        'Accept-Ranges': 'bytes'
+      });
+      const ffmpeg = spawn('ffmpeg', [
+        '-i', videoUrl,
+        '-c:v', 'libx264',
+        '-c:a', 'aac',
+        '-f', 'mp4',
+        '-preset', 'ultrafast',
+        '-tune', 'zerolatency',
+        '-movflags', '+faststart',
+        '-'
+      ]);
+      ffmpeg.stdout.pipe(res);
+      ffmpeg.stderr.on('data', d => console.log('ffmpeg:', d.toString()));
+      req.on('close', () => ffmpeg.kill());
+    } else {
+      res.writeHead(200, {
+        'Content-Type': 'video/mp4',
+        'Access-Control-Allow-Origin': '*',
+        'Accept-Ranges': 'bytes'
+      });
+      const curl = spawn('curl', [
+        '-L', '-R', '-',
+        '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        '-H', 'Sec-Fetch-Dest: none',
+        '-H', 'Sec-Fetch-Mode: no-cors',
+        '-H', 'Sec-Fetch-Site: cross-site',
+        videoUrl
+      ]);
+      curl.stdout.pipe(res);
+      curl.stderr.on('data', () => {});
+      req.on('close', () => curl.kill());
+    }
+  } else if (req.url.startsWith('/proxy/')) {
+    const videoUrl = decodeURIComponent(req.url.slice(7));
+    console.log('[PROXY] Legacy proxy:', videoUrl);
+    try {
+      res.writeHead(200, {
+        'Content-Type': 'video/mp4',
+        'Access-Control-Allow-Origin': '*',
+        'Accept-Ranges': 'bytes'
+      });
+      const { spawn } = require('child_process');
+      const process = spawn('curl', ['-L', '-R', '-', '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', '--referer', 'https://premilkyway.com/', videoUrl]);
+      process.stdout.pipe(res);
+      process.stderr.on('data', () => {});
+      req.on('close', () => process.kill());
+    } catch (e) {
+      res.writeHead(500);
+      res.end('Error: ' + e.message);
+    }
+  } else if (req.url.startsWith('/bypass/')) {
+    const videoUrl = decodeURIComponent(req.url.slice(8));
+    console.log('[BYPASS] yt-dlp bypass:', videoUrl);
+    res.writeHead(200, {
+      'Content-Type': 'video/mp4',
+      'Access-Control-Allow-Origin': '*',
+      'Accept-Ranges': 'bytes'
+    });
+    const ytdlp = spawn('yt-dlp', [
+      '-o', '-',
+      '-f', 'best[ext=mp4]/best',
+      '--no-check-certificate',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      videoUrl
+    ]);
+    ytdlp.stdout.pipe(res);
+    ytdlp.stderr.on('data', d => console.log('yt-dlp:', d.toString()));
+    req.on('close', () => ytdlp.kill());
+  } else if (req.url.startsWith('/download/')) {
+    const videoUrl = decodeURIComponent(req.url.slice(10));
+    console.log('Downloading:', videoUrl);
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+    const { spawn } = require('child_process');
+    const ytdlp = spawn('yt-dlp', [
+      '-o', '-',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '-f', 'best[ext=mp4]/best',
+      '--no-check-certificate',
+      videoUrl
+    ]);
+    ytdlp.stdout.pipe(res);
+    ytdlp.stderr.on('data', d => console.log('yt-dlp:', d.toString()));
+    req.on('close', () => ytdlp.kill());
   } else {
     res.writeHead(404);
     res.end();
@@ -107,13 +201,17 @@ wss.on('connection', (ws) => {
         case 'change-movie':
           if (currentRoom) {
             const room = getRoom(currentRoom);
-            room.state.currentMovie = message.movie;
+            const movie = { ...message.movie };
+            
+            console.log(`[MOVIE] ${username} changed to: ${movie.url}`);
+
+            room.state.currentMovie = movie;
             room.state.time = 0;
             room.state.action = 'pause';
 
             broadcastToRoom(currentRoom, {
               type: 'movie-changed',
-              movie: message.movie,
+              movie: movie,
               username
             });
           }

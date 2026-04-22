@@ -518,13 +518,48 @@
         }
 
         // --- PLAYER LOGIC ---
+        function validateUrl(url) {
+            const issues = [];
+            
+            // Check protocol
+            if (url.startsWith('http://')) {
+                issues.push('HTTP (غير آمن)');
+            }
+            
+            // Check common blocked domains
+            const blockedDomains = ['premilkyway.com', 'egydead.net', 'mycima.link', 'akwam.ir'];
+            for (const domain of blockedDomains) {
+                if (url.includes(domain)) {
+                    issues.push(`محمي: ${domain}`);
+                }
+            }
+            
+            // Check for common video extensions
+            const isVideo = url.match(/\.(mp4|webm|mkv|avi|m3u8|mpd|ts)$/i) || url.includes('master.m3u8') || url.includes('playlist.m3u8');
+            if (!isVideo) {
+                issues.push('ليس رابط فيديو');
+            }
+            
+            return issues;
+        }
+
         function loadVideo(movie) {
             if (currentMovie && currentMovie.url === movie.url) return;
 
             currentMovie = movie;
-            const url = movie.url;
+            let url = movie.url;
             console.log('Loading:', url);
             retryCount = 0;
+
+            // Auto-route through proxy for blocked domains
+            const blockedDomains = ['premilkyway', 'egydead', 'mycima', 'akwam', 'token', 'signature', 'cloudfront', 'akamaized'];
+            for (const domain of blockedDomains) {
+                if (url.includes(domain) && !url.startsWith('/')) {
+                    url = '/bypass/' + encodeURIComponent(url);
+                    console.log('[PROXY] Rerouting through bypass:', url);
+                    break;
+                }
+            }
 
             document.getElementById('currentTitle').textContent = movie.name;
             document.getElementById('currentUrl').textContent = url;
@@ -597,29 +632,40 @@
             }
         }
 
-        video.onerror = () => {
+        video.onerror = async () => {
             if (video.src && video.src !== window.location.href) {
                 let errDetail = "Unknown Error";
+                let suggestion = "";
                 if (video.error) {
                     switch (video.error.code) {
                         case 1: errDetail = "Aborted"; break;
-                        case 2: errDetail = "Network Error"; break;
-                        case 3: errDetail = "Decode Error"; break;
-                        case 4: errDetail = "Source Not Supported / Access Denied"; break;
+                        case 2: errDetail = "Network Error"; suggestion = "تحقق من اتصال الإنترنت"; break;
+                        case 3: errDetail = "Decode Error"; suggestion = "صيغة الفيديو غير مدعومة"; break;
+                        case 4: errDetail = "Access Denied"; suggestion = "🔐 الرابط محمي - جرب استخدام التحميل التلقائي"; break;
                     }
                 }
                 console.error("Native Video Error:", errDetail, video.error);
 
                 if (!video.getAttribute('crossorigin') && retryCount < 1) {
-                    console.log("Retrying with CORS anonymous...");
+                    console.log("[RETRY] Trying with CORS anonymous...");
                     retryCount++;
                     video.setAttribute('crossorigin', 'anonymous');
                     video.load();
                     return;
                 }
 
-                showSyncIndicator('❌ فشل تحميل الفيديو (قد يكون الرابط محمي أو منتهي)');
-                reportPlaybackError(errDetail);
+                // Try proxy bypass as fallback
+                if (retryCount < 2 && video.src && !video.src.startsWith('/')) {
+                    const originalUrl = video.src;
+                    retryCount++;
+                    console.log("[RETRY] Trying server bypass for:", originalUrl);
+                    video.src = '/stream/' + encodeURIComponent(originalUrl);
+                    return;
+                }
+
+                const msg = suggestion ? `${errDetail} - ${suggestion}` : errDetail;
+                showSyncIndicator('❌ فشل التشغيل: ' + msg);
+                reportPlaybackError(msg);
             }
         };
 
@@ -683,8 +729,23 @@
 
         function playCustomLink() {
             if (!isConnected) return;
-            const url = customUrlInput.value.trim();
+            let url = customUrlInput.value.trim();
             if (!url) return alert("الرجاء إدخال رابط");
+
+            // Auto-detect and warn about HTTP
+            if (url.startsWith('http://')) {
+                showSyncIndicator('⚠️ تنبيه: HTTP غير آمن، جاري المحاولة...');
+            }
+
+            // Auto-route through proxy for blocked domains
+            const blockedDomains = ['premilkyway', 'egydead', 'mycima', 'akwam', 'token', 'signature', 'cloudfront', 'akamaized'];
+            for (const domain of blockedDomains) {
+                if (url.includes(domain) && !url.startsWith('/')) {
+                    showSyncIndicator('🔐 استخدام وسيط للتحميل...');
+                    url = '/bypass/' + encodeURIComponent(url);
+                    break;
+                }
+            }
 
             // Webpage detection
             const isWebpage = !url.toLowerCase().split('?')[0].match(/\.(mp4|m3u8|mkv|mov|avi)$/) &&
@@ -692,7 +753,7 @@
 
             if (isWebpage) {
                 showSyncIndicator('✨ جاري استخراج الفيديو تلقائيًا...');
-                ws.send(JSON.stringify({ type: 'resolve-url', url: url }));
+                ws.send(JSON.stringify({ type: 'resolve-url', url: customUrlInput.value.trim() }));
                 return;
             }
 
@@ -705,8 +766,10 @@
             };
             ws.send(JSON.stringify({ type: 'change-movie', movie }));
 
-            // Advice for reliability
-            addSystemMessage('⚠️ ملاحظة: بعض الروابط المباشرة قد لا تعمل لدى الآخرين بسبب قيود الموقع الأصلي. يفضل استخدام التحميل للمخزن للمشاهدة الجماعية الثابتة.');
+            // Advice for some links
+            if (url.includes('/bypass/')) {
+                addSystemMessage('✅ جاري التحميل через الوكيل - قد يستغرق وقتًا');
+            }
         }
 
         function closeLinkHelper() {
@@ -716,12 +779,8 @@
         // --- WEBSOCKET ---
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            let wsUrl = `${protocol}//${window.location.host}/ws`;
-
-            // Local Development Redirect
-            if (window.location.port === '8080' || window.location.port === '8081') {
-                wsUrl = `ws://${window.location.hostname}:3000/ws`;
-            }
+            // Connect directly to websocket port since it's exposed
+            let wsUrl = `ws://${window.location.hostname}:3000/ws`;
 
             ws = new WebSocket(wsUrl);
 
